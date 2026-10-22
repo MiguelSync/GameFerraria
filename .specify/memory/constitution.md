@@ -1,20 +1,24 @@
 <!--
 Sync Impact Report
-- Versão: (modelo sem versão) → 1.0.0 (primeira ratificação; todos os princípios são novos)
-- Princípios definidos:
-  - [PRINCIPLE_1] → I. Especificação antes do código (NÃO NEGOCIÁVEL)
-  - [PRINCIPLE_2] → II. Servidor é a única fonte da verdade, um evento por vez
-  - [PRINCIPLE_3] → III. Pedido separado de fato; a recusa também é um evento
-  - [PRINCIPLE_4] → IV. Temporizadores do servidor são fontes de eventos
-  - [PRINCIPLE_5] → V. Todo fato carrega a sua causa, visível no Painel de eventos
-  - (novo)        → VI. Disciplina de escopo
-  - (novo)        → VII. Um commit por etapa
-- Seções adicionadas: "Restrições do trabalho", "Fluxo de desenvolvimento", "Governança"
+- Versão: 1.0.0 → 1.0.1 (PATCH: esclarecimento de redação; nenhum princípio removido, redefinido
+  ou acrescentado)
+- Princípios modificados:
+  - VI. Disciplina de escopo (título mantido): a regra do visual passa a dizer explicitamente que
+    arte ORIGINAL criada para o projeto (inclusive gerada por script versionado no repositório),
+    com licença livre declarada no README, conta como arte de uso livre; a proibição de arte,
+    nomes e assets de jogos comerciais continua igual.
+- Seções modificadas:
+  - "Restrições do trabalho": "gráficos feitos do zero" deixa de aparecer como fora do escopo e
+    passa a "não exigido; só como extra, nos termos do princípio VI", alinhado ao "Não precisa"
+    do enunciado.
+- Seções adicionadas: nenhuma
 - Seções removidas: nenhuma
-- Templates (.specify/templates/*): lidos em tempo de execução; nenhum alterado por este comando
-  ✅ plan-template.md (o "Constitution Check" deve verificar os princípios I–VII)
+- Motivação: feature `specs/002-visual-ferraria` (identidade visual em pixel art original).
+- Templates (.specify/templates/*): nenhum precisa mudar
+  ✅ plan-template.md (o "Constitution Check" continua verificando os princípios I–VII)
   ✅ spec-template.md (sem mudança necessária)
-  ✅ tasks-template.md (as tarefas devem ser agrupadas por etapa do guia, ver princípio VII)
+  ✅ tasks-template.md (sem mudança necessária)
+  ✅ CLAUDE.md (continua coerente: nenhuma arte, nome ou asset de jogo comercial)
 - TODOs adiados: nenhum
 -->
 
@@ -101,9 +105,11 @@ Justificativa: o painel é o que mostra o paradigma funcionando e é avaliado no
   da especificação.
 - Extras (como os contadores por evento, no trabalho individual) MUST ser feitos só depois de
   tudo o que é obrigatório funcionar e MUST ser listados no README.
-- O visual MUST usar apenas emojis, CSS ou arte de uso livre com crédito no README. Arte, nomes
-  ou assets de jogos comerciais MUST NOT ser usados; a inspiração de "vila aconchegante" é só de
-  clima.
+- O visual MUST usar apenas emojis, CSS ou arte de uso livre com crédito no README. Arte ORIGINAL
+  criada para o projeto, inclusive a gerada por script versionado no repositório, conta como arte
+  de uso livre desde que o README declare a autoria, a licença livre e, se houver, o uso de IA na
+  sua criação. Arte, nomes ou assets de jogos comerciais MUST NOT ser usados; a inspiração de
+  "vila aconchegante" é só de clima.
 
 Justificativa: o enunciado penaliza escopo incompleto ou excedente, e proíbe arte de jogos
 comerciais.
@@ -124,8 +130,9 @@ trabalho, com a especificação antes do código.
   (@MiguelSync).
 - Dois papéis: o Mestre abre e encerra a temporada (e publica encomendas); o Jogador constrói
   forjas (e entrega encomendas).
-- Não fazem parte do escopo: login e senha, banco de dados (a memória do servidor basta),
-  publicação na internet, gráficos feitos do zero.
+- Não fazem parte do escopo: login e senha, banco de dados (a memória do servidor basta) e
+  publicação na internet. Gráficos feitos do zero não são exigidos; só podem entrar como extra,
+  depois de tudo o que é obrigatório funcionar, nos termos do princípio VI.
 - Idioma: português do Brasil em documentos, textos da tela, comentários e commits.
 - Rodapé da aplicação MUST mostrar o nome do desenvolvedor. O README MUST ter integrantes com @,
   como instalar e executar, como testar com duas abas, as três perguntas do enunciado e a
@@ -154,4 +161,4 @@ trabalho, com a especificação antes do código.
   princípios I–VII, e a revisão de código (agente `revisor-eventos`) MUST verificá-los antes
   da entrega.
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-22 | **Last Amended**: 2026-10-22
+**Version**: 1.0.1 | **Ratified**: 2026-10-22 | **Last Amended**: 2026-10-22

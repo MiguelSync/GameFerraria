@@ -209,6 +209,16 @@
         this.ultimo = null;     // último estado recebido
         this.criarAnimacoes();
 
+        // camada de luz (madrugada, dia ou noite) por cima do cenário e dos personagens;
+        // os brilhos das lanternas ficam acima dela, em modo de luz somada
+        this.luz = this.add.rectangle(this.larg / 2, this.alt / 2, this.larg, this.alt, 0x2a3a6a, 0).setDepth(16);
+        this.brilhos = this.lanternas.map((l) => this.add.circle(l.x, l.y - 3, 9, 0xffd54a, 0)
+          .setDepth(17).setBlendMode(Phaser.BlendModes.ADD));
+        this.fase = "madrugada";
+        this.aplicarFase("madrugada", 0);
+        // aba que volta do segundo plano: termina as cenas e redesenha pelo último estado
+        this.game.events.on("visible", () => { this.completarTudo(); if (this.ultimo) this.reconstruir(this.ultimo); });
+
         this.faixa = this.add.text(this.larg / 2, 9, "⏳ Aguardando o Mestre abrir a ferraria", {
           fontSize: "8px", color: "#ffffff", backgroundColor: "#2b1d14cc",
           padding: { x: 5, y: 2 }, resolution: 2,
@@ -301,6 +311,29 @@
       completarTudo() { Object.keys(this.cenas).forEach((k) => this.completarCena(k)); }
 
       lote(i) { return this.p["lote" + ((i % 6) + 1)]; }
+
+      // ----- dia e noite: só os fatos mudam a fase, nunca um relógio -----
+      faseDe(estado) { return { aguardando: "madrugada", aberta: "dia", encerrada: "noite" }[estado.fase]; }
+      aplicarFase(fase, ms) {                 // ms = 0: sem transição (sincronização)
+        const LUZ = { madrugada: [0x2a3a6a, 0.35], dia: [0x2a3a6a, 0], noite: [0x0b1030, 0.55] };
+        const [cor, alfa] = LUZ[fase];
+        this.fase = fase;
+        if (fase !== "dia") this.luz.setFillStyle(cor, ms ? this.luz.fillAlpha : alfa);
+        const acesas = fase !== "dia";
+        this.lanternas.forEach((l) => l.definirQuadro(acesas ? 15 : 14));
+        this.mina.definirQuadro(fase === "dia" ? 6 : 5);
+        this.faixa && this.faixa.setText({ madrugada: "⏳ Aguardando o Mestre abrir a ferraria",
+          dia: "☀️ Temporada aberta", noite: "🌙 Temporada encerrada" }[fase]);
+        if (!ms) {
+          this.luz.fillAlpha = alfa;
+          this.brilhos.forEach((b) => b.setFillStyle(0xffd54a, acesas ? 0.35 : 0));
+          return;
+        }
+        this.iniciarCena("luz", (c) => {
+          c.tween({ targets: this.luz, fillAlpha: alfa, duration: ms, ease: "Sine.InOut" });
+          c.tween({ targets: this.brilhos, fillAlpha: acesas ? 0.35 : 0, duration: ms });
+        });
+      }
 
       flutuar(texto, x, y, cor) {
         const t = this.add.text(x, y, texto, {
@@ -444,7 +477,12 @@
         this.obras.forEach((o) => { o.canteiro.destroy(); o.fundo.destroy(); o.barra.destroy(); });
         this.obras = [];
         this.usados = 0;
-        for (let k = 0; k < estado.concluidas; k++) this.criarForja(this.usados++, false);
+        const fase = this.faseDe(estado);
+        this.aplicarFase(fase, 0);
+        for (let k = 0; k < estado.concluidas; k++) {
+          const forja = this.criarForja(this.usados++, false);
+          if (fase !== "dia") this.apagarForja(forja);          // forja fria fora da temporada
+        }
         this.criarFerreiros(estado.limite);
         for (let k = 0; k < estado.em_obra; k++) {
           const obra = this.criarObra("andamento");
@@ -453,22 +491,21 @@
             const alvo = this.rotaAte(f, obra).pop();
             f.obra = obra; obra.ferreiro = f;
             f.sprite.setPosition(alvo.x, alvo.y); this.profundidade(f.sprite);
-            this.animar(f.sprite, "martelar");
+            if (fase === "dia") this.animar(f.sprite, "martelar");
           }
+          if (fase === "noite") obra.barra.anima.pause();       // a obra parou com a temporada
         }
         this.desenharPilha(estado.lingotes);
       }
 
       // ----- um método para cada fato do servidor -----
-      mostrarEstado(estado) {                 // estado.sincronizado
+      mostrarEstado(estado) {                 // estado.sincronizado: a vila como está, sem animação
         this.reconstruir(estado);
-        if (estado.encomenda) this.criarPergaminho(estado.encomenda);
-        if (estado.fase === "aberta") this.vilaIniciada(estado);
-        if (estado.fase === "encerrada") this.vilaEncerrada(estado);
+        if (estado.encomenda && estado.fase === "aberta") this.criarPergaminho(estado.encomenda);
       }
-      vilaIniciada(estado) {                  // vila.iniciada
-        this.faixa.setText("☀️ Temporada aberta");
-        this.mina.definirQuadro(6);
+      vilaIniciada(estado) {                  // vila.iniciada: amanhece
+        this.aplicarFase("dia", 1500);
+        this.conferir(estado);
       }
       obraIniciada(estado) {                  // forja.construcao_iniciada
         const obra = this.criarObra("exata", estado.tempo_obra * 1000);
@@ -476,7 +513,9 @@
         const f = this.ferreiros.find((x) => !x.obra);
         if (f) {                              // um ferreiro livre sai da mina e vai martelar
           f.obra = obra; obra.ferreiro = f;
-          this.caminhar(f, this.rotaAte(f, obra), () => { if (f.obra === obra) this.animar(f.sprite, "martelar"); });
+          this.caminhar(f, this.rotaAte(f, obra), () => {
+            if (f.obra === obra && this.fase === "dia") this.animar(f.sprite, "martelar");
+          });
         }
         this.conferir(estado);
       }
@@ -546,10 +585,21 @@
         this.removerPergaminho();
         this.flutuar("⌛ Encomenda expirou", this.p.quadro.x - 24, this.p.quadro.y - 20, "#a8322a");
       }
-      vilaEncerrada(estado) {                 // vila.encerrada
-        this.faixa.setText("🌙 Temporada encerrada");
+      vilaEncerrada(estado) {                 // vila.encerrada: anoitece e tudo para
+        this.aplicarFase("noite", 2500);
+        this.lotes.forEach((l) => l.forjas.forEach((forja) => this.apagarForja(forja)));
+        const carrinho = this.cenas.carrinho;  // o carrinho para onde estiver
+        if (carrinho) {
+          delete this.cenas.carrinho;
+          carrinho.tweens.forEach((t) => t.pause());
+          carrinho.timers.forEach((t) => t.remove(false));
+        }
+        this.obras.forEach((o) => {           // martelos param e as barras congelam
+          o.barra.anima.pause();
+          if (o.ferreiro && !this.cenas["ferreiro" + this.ferreiros.indexOf(o.ferreiro)]) this.parar(o.ferreiro.sprite, 0);
+        });
         this.removerPergaminho();
-        this.add.rectangle(this.larg / 2, this.alt / 2, this.larg, this.alt, 0x000033, 0.35).setDepth(15);
+        this.conferir(estado);
       }
     }
 
@@ -658,16 +708,16 @@
 
         // Só esta aba recebe, logo ao conectar: é o estado atual da vila,
         // que pode já ter forjas prontas, obras e encomenda em andamento.
-        ouvir("estado.sincronizado", "guarda o estado e desenha a vila como está agora", (d) => {
+        ouvir("estado.sincronizado", "desenha a vila como está agora (nada muda): luz da fase, forjas, obras, ferreiros, pilha e encomenda", (d) => {
           atualizar(d);
           jogo.mostrarEstado(d.estado);
         });
 
         // Fato para todos: o Mestre abriu a temporada e a mina começa a produzir.
-        ouvir("vila.iniciada", "muda a faixa para temporada aberta", (d) => {
+        ouvir("vila.iniciada", "amanhece: a temporada abre, a mina abre e a lanterna apaga", (d) => {
           atualizar(d);
           avisar("A temporada começou!", "ok");
-          jogo.vilaIniciada();
+          jogo.vilaIniciada(d.estado);
         });
 
         // Fato para todos: um pedido de forja foi aceito, então todas as abas
@@ -701,10 +751,10 @@
         });
 
         // Fato para todos: o Mestre encerrou; a partir daqui todo pedido é recusado.
-        ouvir("vila.encerrada", "escurece a vila e passa a mostrar temporada encerrada", (d) => {
+        ouvir("vila.encerrada", "anoitece: a temporada fecha, forjas apagam, lanternas acendem e as obras param", (d) => {
           atualizar(d);
           avisar("Temporada encerrada.");
-          jogo.vilaEncerrada();
+          jogo.vilaEncerrada(d.estado);
         });
 
         // Fato para todos: o Mestre publicou uma encomenda e o prazo começou a

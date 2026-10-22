@@ -13,3 +13,6 @@ instruções/
 
 # Estado local do Maestri (papéis dos agentes)
 .maestri/
+
+# Folha de contato gerada por tools/gerar_arte.py --previa
+tools/previa.png

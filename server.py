@@ -197,24 +197,28 @@ async def publicar_encomenda(sid, dados=None):
         await recusar(sid, motivo, pedido)    # só quem pediu recebe
         return
     ultima_encomenda += 1
+    id_encomenda = ultima_encomenda
+    expira_em = time.monotonic() + ENCOMENDA_PRAZO
     estado["encomenda"] = {
-        "id": ultima_encomenda,
+        "id": id_encomenda,
         "quantidade": ENCOMENDA_QUANTIDADE,
         "prazo": ENCOMENDA_PRAZO,
         "recompensa": ENCOMENDA_RECOMPENSA,
         "por": quem["nome"],
-        "expira_em": time.monotonic() + ENCOMENDA_PRAZO,
+        "expira_em": expira_em,
     }
+    # O prazo começa a correr no mesmo instante em que a encomenda foi criada.
+    sio.start_background_task(prazo_encomenda, id_encomenda, expira_em)
     # FATO para todos: todos os jogadores podem tentar cumprir a encomenda.
     await sio.emit("encomenda.publicada", fato(pedido, por=quem["nome"]))
-    sio.start_background_task(prazo_encomenda, ultima_encomenda)   # o prazo começa a correr
 
 
-async def prazo_encomenda(id_encomenda):
-    """Temporizador do prazo: se a MESMA encomenda ainda estiver ativa depois
-    de ENCOMENDA_PRAZO segundos, ela expira. O id evita expirar uma encomenda
-    nova publicada depois que esta foi cumprida."""
-    await sio.sleep(ENCOMENDA_PRAZO)
+async def prazo_encomenda(id_encomenda, expira_em):
+    """Temporizador do prazo: se a MESMA encomenda ainda estiver ativa quando
+    o prazo vencer (expira_em), ela expira. O id evita expirar uma encomenda
+    nova publicada depois que esta foi cumprida. É este evento do temporizador
+    que decide a expiração: até ele chegar, a encomenda continua ativa."""
+    await sio.sleep(max(0, expira_em - time.monotonic()))
     encomenda = estado["encomenda"]
     if estado["fase"] != "aberta" or encomenda is None or encomenda["id"] != id_encomenda:
         return

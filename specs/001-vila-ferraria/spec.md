@@ -47,18 +47,18 @@ ainda no estoque. A recompensa da encomenda (40) paga exatamente uma forja.
 |---|---|---|---|---|
 | `estado.sincronizado` | Servidor | Só quem conectou | Nada muda; entrega o estado atual a quem acabou de entrar | `conexao` |
 | `vila.abertura_solicitada` | Mestre | Servidor | É um pedido; nada muda | — |
-| `vila.iniciada` | Servidor | Todos | Fase: aguardando → aberta; a produção começa | `vila.abertura_solicitada` |
+| `vila.iniciada` | Servidor | Todos | Fase: aguardando → aberta; a produção começa | `vila.abertura_solicitada` + nome do Mestre que pediu |
 | `forja.construcao_solicitada` | Jogador | Servidor | É um pedido; nada muda | — |
-| `forja.construcao_iniciada` | Servidor | Todos | Minérios −40; ferreiros ocupados +1; forjas em obra +1 | `forja.construcao_solicitada` |
-| `operacao.recusada` | Servidor | Só quem pediu | Nada muda; informa o motivo | o pedido recusado |
+| `forja.construcao_iniciada` | Servidor | Todos | Minérios −40; ferreiros ocupados +1; forjas em obra +1 | `forja.construcao_solicitada` + nome de quem pediu |
+| `operacao.recusada` | Servidor | Só quem pediu | Nada muda; informa o motivo | o pedido recusado + o motivo |
 | `recurso.produzido` | Servidor | Todos | Minérios +10; lingotes + (número de forjas concluídas) | `temporizador` |
-| `forja.construcao_concluida` | Servidor | Todos | Ferreiros ocupados −1; forjas em obra −1; forjas concluídas +1 | `forja.construcao_iniciada (temporizador)` |
+| `forja.construcao_concluida` | Servidor | Todos | Ferreiros ocupados −1; forjas em obra −1; forjas concluídas +1 | `forja.construcao_iniciada (temporizador)` + nome de quem pediu a obra |
 | `vila.encerramento_solicitado` | Mestre | Servidor | É um pedido; nada muda | — |
-| `vila.encerrada` | Servidor | Todos | Fase: aberta → encerrada; temporizadores param; encomenda ativa é descartada | `vila.encerramento_solicitado` |
+| `vila.encerrada` | Servidor | Todos | Fase: aberta → encerrada; temporizadores param; encomenda ativa é descartada | `vila.encerramento_solicitado` + nome do Mestre que pediu |
 | `encomenda.publicacao_solicitada` | Mestre | Servidor | É um pedido; nada muda | — |
-| `encomenda.publicada` | Servidor | Todos | Encomenda ativa: nenhuma → 3 lingotes, prazo 30 s, recompensa 40 minérios | `encomenda.publicacao_solicitada` |
+| `encomenda.publicada` | Servidor | Todos | Encomenda ativa: nenhuma → 3 lingotes, prazo 30 s, recompensa 40 minérios | `encomenda.publicacao_solicitada` + nome do Mestre que publicou |
 | `encomenda.entrega_solicitada` | Jogador | Servidor | É um pedido; nada muda | — |
-| `encomenda.cumprida` | Servidor | Todos | Lingotes −3; minérios +40; encomenda ativa → nenhuma | `encomenda.entrega_solicitada` |
+| `encomenda.cumprida` | Servidor | Todos | Lingotes −3; minérios +40; encomenda ativa → nenhuma | `encomenda.entrega_solicitada` + nome de quem entregou |
 | `encomenda.expirada` | Servidor | Todos | Encomenda ativa → nenhuma (nada é debitado nem pago) | `encomenda.publicada (temporizador)` |
 
 ### Motivos de recusa (texto exato de `operacao.recusada`)
@@ -71,7 +71,11 @@ ainda no estoque. A recompensa da encomenda (40) paga exatamente uma forja.
 | `encomenda.publicacao_solicitada` | 1. não é Mestre → "Só o Mestre pode publicar encomendas"; 2. fase diferente de aberta → "A temporada não está aberta"; 3. já há encomenda ativa → "Já existe uma encomenda ativa" |
 | `encomenda.entrega_solicitada` | 1. não é Jogador → "Só Jogadores entregam encomendas"; 2. fase diferente de aberta → "A temporada não está aberta"; 3. sem encomenda ativa → "Nenhuma encomenda ativa"; 4. lingotes < 3 → "Lingotes insuficientes" |
 
-A primeira verificação que falhar define o motivo; as demais não são avaliadas.
+A primeira verificação que falhar define o motivo; as demais não são avaliadas. Como o papel é
+sempre verificado antes da fase, fora da temporada quem tem o papel certo recebe "A temporada não
+está aberta" (ou "A temporada já foi aberta", no caso da abertura), e quem tem o papel errado recebe
+o motivo de papel (ex.: o Mestre que pede uma forja depois do encerramento recebe "Só Jogadores
+constroem forjas").
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -93,7 +97,8 @@ temporada" no Mestre; as duas abas mudam para "aberta" sem recarregar.
    `estado.sincronizado` com causa `conexao`, mostrando 120 minérios, 0 lingotes, ferreiros 0/2,
    0 forjas e fase aguardando.
 2. **Given** a fase aguardando, **When** o Mestre emite `vila.abertura_solicitada`, **Then** todos
-   recebem `vila.iniciada` com causa `vila.abertura_solicitada` e a fase passa a aberta.
+   recebem `vila.iniciada` com causa `vila.abertura_solicitada` e o nome do Mestre, e a fase passa
+   a aberta.
 3. **Given** a fase aguardando, **When** um Jogador emite `vila.abertura_solicitada`, **Then** só ele
    recebe `operacao.recusada` com motivo "Só o Mestre pode abrir a temporada" e a fase continua
    aguardando.
@@ -191,7 +196,8 @@ temporada"; o estoque para de subir e "Construir forja" passa a ser recusado.
 **Acceptance Scenarios**:
 
 1. **Given** a fase aberta, **When** o Mestre emite `vila.encerramento_solicitado`, **Then** todos
-   recebem `vila.encerrada` com causa `vila.encerramento_solicitado` e a fase passa a encerrada.
+   recebem `vila.encerrada` com causa `vila.encerramento_solicitado` e o nome do Mestre, e a fase
+   passa a encerrada.
 2. **Given** a fase encerrada, **When** passam 5 segundos ou mais, **Then** nenhum
    `recurso.produzido` é emitido.
 3. **Given** uma forja em obra no momento do encerramento, **When** completam-se os 12 segundos da
@@ -216,13 +222,14 @@ acabar antes, a encomenda expira sozinha.
 das histórias 1 a 3 funcionando.
 
 **Independent Test**: abrir a temporada, construir duas forjas, publicar a encomenda e entregá-la
-depois que os lingotes chegarem a 3; em outra rodada, publicar e esperar 30 segundos.
+depois que os lingotes chegarem a pelo menos 3 (com 2 forjas eles sobem 0 → 2 → 4); em outra rodada, publicar e esperar 30 segundos.
 
 **Acceptance Scenarios**:
 
 1. **Given** a temporada aberta e nenhuma encomenda ativa, **When** o Mestre emite
    `encomenda.publicacao_solicitada`, **Then** todos recebem `encomenda.publicada` com causa
-   `encomenda.publicacao_solicitada`, quantidade 3, prazo 30 s e recompensa 40 minérios.
+   `encomenda.publicacao_solicitada` e o nome do Mestre, quantidade 3, prazo 30 s e recompensa
+   40 minérios.
 2. **Given** uma encomenda ativa e 4 lingotes, **When** o Jogador A emite
    `encomenda.entrega_solicitada`, **Then** todos recebem `encomenda.cumprida` com causa
    `encomenda.entrega_solicitada` e o nome de A; lingotes 1, minérios +40, nenhuma encomenda ativa.
@@ -261,8 +268,11 @@ No alto do Painel de eventos aparecem etiquetas com quantas vezes cada evento j�
 
 ### Edge Cases
 
-- Pedido feito antes da abertura ou depois do encerramento → `operacao.recusada` "A temporada não
-  está aberta", só para quem pediu.
+- Pedido feito antes da abertura ou depois do encerramento → `operacao.recusada` só para quem
+  pediu, com o motivo dado pela ordem do catálogo (papel antes de fase): quem tem o papel certo
+  recebe "A temporada não está aberta"; quem tem o papel errado recebe o motivo de papel (ex.:
+  Mestre pedindo forja depois do encerramento → "Só Jogadores constroem forjas"); e o Mestre que
+  pede a abertura de uma temporada já aberta ou encerrada recebe "A temporada já foi aberta" (US5#6).
 - Dois pedidos chegam no mesmo instante → tratados em sequência; a segunda validação já enxerga o
   estado deixado pelo primeiro (US4).
 - Ciclo de produção e fim de obra no mesmo instante → tratados em sequência; a forja só rende
@@ -288,7 +298,8 @@ No alto do Painel de eventos aparecem etiquetas com quantas vezes cada evento j�
   encerrada, sem voltar de fase.
 - **FR-003**: Apenas o Mestre MUST conseguir abrir (`vila.abertura_solicitada` → `vila.iniciada`) e
   encerrar (`vila.encerramento_solicitado` → `vila.encerrada`) a temporada; os demais pedidos desses
-  tipos MUST ser recusados com os motivos do catálogo.
+  tipos MUST ser recusados com os motivos do catálogo. `vila.iniciada` e `vila.encerrada` MUST
+  levar a causa e o nome do Mestre que pediu.
 - **FR-004**: Ao conectar, a pessoa MUST receber `estado.sincronizado` apenas para si, com o estado
   completo atual e causa `conexao`.
 
@@ -318,14 +329,20 @@ No alto do Painel de eventos aparecem etiquetas com quantas vezes cada evento j�
 - **FR-011**: Ao `vila.encerrada`, o sistema MUST parar a produção, descartar a encomenda ativa e
   não emitir mais `recurso.produzido`, `forja.construcao_concluida` nem `encomenda.expirada`; obras
   em andamento ficam inacabadas no estado final.
-- **FR-012**: Depois do encerramento, todo pedido de construção, publicação ou entrega MUST ser
-  recusado com "A temporada não está aberta".
+- **FR-012**: Antes da abertura e depois do encerramento, todo pedido de encerramento, construção,
+  publicação ou entrega MUST ser recusado, e depois do encerramento também o pedido de abertura.
+  O motivo MUST seguir a ordem do catálogo de motivos, em que o papel é verificado antes da fase:
+  quem tem o papel certo recebe "A temporada não está aberta" (ou "A temporada já foi aberta", na
+  abertura pedida pelo Mestre depois do encerramento); quem tem o papel errado recebe o motivo de
+  papel daquele pedido (ex.: Mestre pedindo forja depois do encerramento recebe "Só Jogadores
+  constroem forjas").
 
 **Encomenda (fluxo próprio)**
 
 - **FR-013**: O Mestre MUST poder publicar uma encomenda (`encomenda.publicacao_solicitada`) com
   valores fixos: 3 lingotes, prazo de 30 segundos e recompensa de 40 minérios; só pode haver uma
-  encomenda ativa por vez. Se aceita, todos recebem `encomenda.publicada`.
+  encomenda ativa por vez. Se aceita, todos recebem `encomenda.publicada`, com causa e nome de
+  quem publicou.
 - **FR-014**: Um Jogador MUST poder entregar a encomenda ativa de uma só vez
   (`encomenda.entrega_solicitada`). Se aceita, MUST debitar 3 lingotes, creditar 40 minérios,
   encerrar a encomenda e emitir `encomenda.cumprida` para todos, com causa e nome de quem entregou.

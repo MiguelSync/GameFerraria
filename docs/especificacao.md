@@ -24,16 +24,29 @@
   vez. Um Jogador entrega os 3 lingotes de uma só vez; se o prazo acabar antes, ela expira sem
   débito nem pagamento.
 - Temporada: aguardando → aberta → encerrada, sem voltar. Só o Mestre abre e encerra. Antes da
-  abertura e depois do encerramento, todo pedido de ação é recusado.
+  abertura e depois do encerramento, todo pedido de ação é recusado, com o motivo dado pela ordem
+  das verificações abaixo.
 - Encerramento: a produção para, a encomenda ativa é descartada (não expira depois) e as obras em
   andamento ficam inacabadas (nenhuma termina depois do encerramento).
-- Ordem das verificações ao pedir uma forja (a primeira que falhar é o motivo): é Jogador? →
-  temporada aberta? → há 40 minérios? → há ferreiro livre?
-- Motivos de recusa: "Só o Mestre pode abrir a temporada", "A temporada já foi aberta",
-  "Só o Mestre pode encerrar a temporada", "A temporada não está aberta",
-  "Só Jogadores constroem forjas", "Minério insuficiente", "Sem ferreiro livre",
-  "Só o Mestre pode publicar encomendas", "Já existe uma encomenda ativa",
-  "Só Jogadores entregam encomendas", "Nenhuma encomenda ativa", "Lingotes insuficientes".
+- Ordem das verificações de cada pedido (a primeira que falhar define o motivo de recusa; as
+  demais não são avaliadas):
+  - `vila.abertura_solicitada`: é Mestre? ("Só o Mestre pode abrir a temporada") → fase é
+    aguardando? ("A temporada já foi aberta", inclusive depois do encerramento).
+  - `vila.encerramento_solicitado`: é Mestre? ("Só o Mestre pode encerrar a temporada") → fase é
+    aberta? ("A temporada não está aberta").
+  - `forja.construcao_solicitada`: é Jogador? ("Só Jogadores constroem forjas") → fase é aberta?
+    ("A temporada não está aberta") → há 40 minérios? ("Minério insuficiente") → há ferreiro
+    livre? ("Sem ferreiro livre").
+  - `encomenda.publicacao_solicitada`: é Mestre? ("Só o Mestre pode publicar encomendas") → fase
+    é aberta? ("A temporada não está aberta") → não há encomenda ativa? ("Já existe uma encomenda
+    ativa").
+  - `encomenda.entrega_solicitada`: é Jogador? ("Só Jogadores entregam encomendas") → fase é
+    aberta? ("A temporada não está aberta") → há encomenda ativa? ("Nenhuma encomenda ativa") →
+    há 3 lingotes? ("Lingotes insuficientes").
+- Consequência da ordem: o papel é sempre verificado antes da fase. Fora da temporada, quem tem o
+  papel certo recebe "A temporada não está aberta"; quem tem o papel errado recebe o motivo de
+  papel (ex.: o Mestre que pede uma forja depois do encerramento recebe "Só Jogadores constroem
+  forjas"). Na abertura, o Mestre que pede de novo recebe "A temporada já foi aberta".
 - Consequência dos números: o estoque inicial pagaria 3 forjas, mas só há 2 ferreiros; por isso,
   logo após a abertura, a 3ª forja é recusada por falta de ferreiro com 40 minérios no estoque.
 
@@ -60,14 +73,14 @@
 Causa que cada fato carrega (aparece no Painel de eventos), junto com o estado atual da vila:
 
 - `estado.sincronizado` → causa `conexao`.
-- `vila.iniciada` → causa `vila.abertura_solicitada`.
+- `vila.iniciada` → causa `vila.abertura_solicitada` + nome do Mestre que pediu.
 - `forja.construcao_iniciada` → causa `forja.construcao_solicitada` + nome de quem pediu.
 - `operacao.recusada` → causa: o nome do pedido recusado + o motivo.
 - `recurso.produzido` → causa `temporizador`.
 - `forja.construcao_concluida` → causa `forja.construcao_iniciada (temporizador)` + nome de quem
   pediu a obra.
-- `vila.encerrada` → causa `vila.encerramento_solicitado`.
-- `encomenda.publicada` → causa `encomenda.publicacao_solicitada`.
+- `vila.encerrada` → causa `vila.encerramento_solicitado` + nome do Mestre que pediu.
+- `encomenda.publicada` → causa `encomenda.publicacao_solicitada` + nome do Mestre que publicou.
 - `encomenda.cumprida` → causa `encomenda.entrega_solicitada` + nome de quem entregou.
 - `encomenda.expirada` → causa `encomenda.publicada (temporizador)`.
 
@@ -82,7 +95,9 @@ lingotes); o fluxo próprio da vila é `encomenda.*`.
 Dado que a temporada está aberta, há 20 minérios no estoque e 1 de 2 ferreiros ocupado, quando o
 Jogador A emite `forja.construcao_solicitada`, então o servidor emite `operacao.recusada` só para A,
 com o motivo "Minério insuficiente" e a causa `forja.construcao_solicitada`; o estoque continua em
-20 minérios, os ferreiros continuam 1/2, nenhuma obra começa e nenhum outro jogador recebe evento.
+20 minérios, os ferreiros continuam 1/2, nenhuma obra começa e nenhum outro jogador recebe
+`operacao.recusada` nem `forja.construcao_iniciada` (um `recurso.produzido` do temporizador pode
+coincidir com o pedido e chega a todos normalmente).
 
 (Como chegar a esse estado: logo após `vila.iniciada`, A pede duas forjas — 40 minérios, 2/2.
 Quando as duas recebem `forja.construcao_concluida`, cerca de 12 s depois, o estoque está em 60;

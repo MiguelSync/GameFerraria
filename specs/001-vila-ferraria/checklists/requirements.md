@@ -40,4 +40,10 @@
 - Coerência conferida com `docs/especificacao.md`: mesmos 15 eventos, mesmos números
   (120 / 40 / 12 s / 2 ferreiros / 5 s / +10 minérios / +1 lingote por forja / encomenda 3 lingotes,
   30 s, +40 minérios) e mesmos motivos de recusa.
+- Validação 2 (2026-10-22, após `/speckit-analyze`): FR-012 e o edge case de pedidos fora da
+  temporada passaram a seguir a ordem do catálogo de motivos (papel antes de fase); a ordem das
+  verificações dos 5 pedidos ficou explícita em `docs/especificacao.md`; `vila.iniciada`,
+  `vila.encerrada` e `encomenda.publicada` levam o nome de quem pediu; o cenário de recusa diz que
+  nenhum outro jogador recebe `operacao.recusada` nem `forja.construcao_iniciada`; o teste da US6
+  espera "pelo menos 3" lingotes. Itens acima continuam aprovados.
 - Próximo passo sugerido: `/speckit-clarify` (opcional) ou `/speckit-plan`.

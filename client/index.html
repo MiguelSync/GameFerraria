@@ -58,10 +58,11 @@
     <div id="jogo"></div>
 
     <section class="painel">
-      <p>🪵 Toras: <strong>{{ estado.toras }}</strong> (+{{ porMinuto }}/min)</p>
-      <p>👷 Trabalhadores: {{ estado.trabalhadores }}/{{ estado.limite }}
-        <progress :value="estado.trabalhadores" :max="estado.limite"></progress></p>
-      <p>🏠 Construções: {{ estado.concluidas }} concluídas, {{ estado.em_obra }} em obra</p>
+      <p>🪨 Minérios: <strong>{{ estado.minerios }}</strong> (+{{ porMinuto }}/min)</p>
+      <p>🧱 Lingotes: <strong>{{ estado.lingotes }}</strong></p>
+      <p>⚒️ Ferreiros: {{ estado.ferreiros }}/{{ estado.limite }}
+        <progress :value="estado.ferreiros" :max="estado.limite"></progress></p>
+      <p>🔥 Forjas: {{ estado.concluidas }} concluídas, {{ estado.em_obra }} em obra</p>
     </section>
 
     <section>
@@ -69,7 +70,7 @@
         <button @click="abrirVila">Abrir temporada</button>
         <button @click="encerrarVila">Encerrar temporada</button>
       </template>
-      <button v-else @click="construir">🔨 Construir (custo {{ estado.custo }} toras)</button>
+      <button v-else @click="construir">🔨 Construir forja (custo {{ estado.custo }} minérios)</button>
     </section>
 
     <ul class="avisos">
@@ -248,8 +249,8 @@
       const papel = ref("");
       const conectado = ref(false);
       const estado = reactive({
-        fase: "aguardando", toras: 0, trabalhadores: 0, limite: 0,
-        producao: 0, intervalo: 0, tempo_obra: 0, custo: 0, concluidas: 0, em_obra: 0,
+        fase: "aguardando", minerios: 0, lingotes: 0, ferreiros: 0, limite: 0, em_obra: 0,
+        concluidas: 0, custo: 0, tempo_obra: 0, intervalo: 0, producao: 0, encomenda: null,
       });
       const avisos = ref([]);
       const eventos = ref([]);              // linha do tempo do painel de eventos
@@ -277,7 +278,8 @@
         if (!d) return "";
         const { estado: e, causa, ...resto } = d;
         const partes = Object.entries(resto).map(([k, v]) => k + ": " + v);
-        if (e) partes.push("toras " + e.toras + ", trabalhadores " + e.trabalhadores + "/" + e.limite);
+        if (e) partes.push("minérios " + e.minerios + ", lingotes " + e.lingotes +
+                           ", ferreiros " + e.ferreiros + "/" + e.limite);
         return partes.join(" · ");
       }
       function registrar(sentido, nome, dados, reacao = "") {
@@ -308,13 +310,13 @@
 
         // ===== ESCUTAS (on): o cliente reage aos FATOS do servidor =====
         // ouvir(evento, "o que o cliente faz ao receber", função)
-        // ETAPA 1: ouvir "estado.sincronizado"   -> jogo.mostrarEstado(...)
-        // ETAPA 2: ouvir "vila.iniciada"         -> jogo.vilaIniciada()
-        // ETAPA 3: ouvir "construcao.iniciada"   -> jogo.obraIniciada(...)
-        // ETAPA 4: ouvir "operacao.recusada"     -> jogo.recusado(...)
-        // ETAPA 5: ouvir "recurso.produzido"     -> jogo.recursoProduzido(...)
-        //          e "construcao.concluida"      -> jogo.obraConcluida(...)
-        // ETAPA 6: ouvir "vila.encerrada"        -> jogo.vilaEncerrada()
+
+        // Só esta aba recebe, logo ao conectar: é o estado atual da vila,
+        // que pode já ter forjas prontas, obras e encomenda em andamento.
+        ouvir("estado.sincronizado", "guarda o estado e desenha a vila como está agora", (d) => {
+          atualizar(d);
+          jogo.mostrarEstado(d.estado);
+        });
       }
 
       // ===== PEDIDOS (emit): o cliente PEDE algo ao servidor =====

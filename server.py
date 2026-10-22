@@ -145,3 +145,21 @@ async def obra(nome):
     # FATO para todos: a causa é a obra iniciada antes, via temporizador.
     causa = "forja.construcao_iniciada (temporizador)"
     await sio.emit("forja.construcao_concluida", fato(causa, por=nome))
+
+
+@sio.on("vila.encerramento_solicitado")
+async def encerrar_vila(sid, dados=None):
+    # Escuta o PEDIDO do Mestre para encerrar a temporada.
+    pedido = "vila.encerramento_solicitado"
+    quem = jogadores[sid]
+    if quem["papel"] != "mestre":
+        await recusar(sid, "Só o Mestre pode encerrar a temporada", pedido)
+        return
+    if estado["fase"] != "aberta":
+        await recusar(sid, "A temporada não está aberta", pedido)
+        return
+    # Os temporizadores param sozinhos: ao acordar, conferem a fase e veem
+    # que ela não está mais aberta (a mina para e as obras ficam inacabadas).
+    estado["fase"] = "encerrada"
+    # FATO para todos: ninguém mais pode agir nesta temporada.
+    await sio.emit("vila.encerrada", fato(pedido, por=quem["nome"]))

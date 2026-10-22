@@ -356,6 +356,13 @@
           avisar("Forja de " + d.por + " pronta! Agora ela funde lingotes.", "ok");
           jogo.obraConcluida(d.estado);
         });
+
+        // Fato para todos: o Mestre encerrou; a partir daqui todo pedido é recusado.
+        ouvir("vila.encerrada", "escurece a vila e passa a mostrar temporada encerrada", (d) => {
+          atualizar(d);
+          avisar("Temporada encerrada.");
+          jogo.vilaEncerrada();
+        });
       }
 
       // ===== PEDIDOS (emit): o cliente PEDE algo ao servidor =====
@@ -369,7 +376,8 @@
         pedir("forja.construcao_solicitada");
       }
       function encerrarVila() {
-        // ETAPA 6: pedir "vila.encerramento_solicitado"
+        // Só PEDE: o servidor confere se é o Mestre e se a temporada está aberta.
+        pedir("vila.encerramento_solicitado");
       }
 
       return { nome, papel, conectado, estado, avisos, eventosVisiveis, contadores, ocultarProducao, porMinuto, lingotesPorMinuto,

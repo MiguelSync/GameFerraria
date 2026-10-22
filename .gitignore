@@ -10,3 +10,6 @@ instruções/
 
 # Configuração local do Claude Code
 .claude/settings.local.json
+
+# Estado local do Maestri (papéis dos agentes)
+.maestri/

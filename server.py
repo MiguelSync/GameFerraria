@@ -80,6 +80,7 @@ async def abrir_vila(sid, dados=None):
         await recusar(sid, "A temporada já foi aberta", pedido)
         return
     estado["fase"] = "aberta"
+    sio.start_background_task(producao)      # a mina começa a produzir sozinha
     # FATO para todos: a temporada mudou para todo mundo ao mesmo tempo.
     await sio.emit("vila.iniciada", fato(pedido, por=quem["nome"]))
 
@@ -114,3 +115,33 @@ async def construir(sid, dados=None):
     nome = quem["nome"]
     # FATO para todos: o estoque e os ferreiros mudaram para a vila inteira.
     await sio.emit("forja.construcao_iniciada", fato(pedido, por=nome))
+    sio.start_background_task(obra, nome)    # o temporizador termina a obra
+
+
+async def producao():
+    """Temporizador da mina: é uma FONTE de eventos. A cada INTERVALO a vila
+    produz e o servidor avisa todos; ninguém precisa perguntar."""
+    while estado["fase"] == "aberta":
+        await sio.sleep(INTERVALO)            # nunca time.sleep: travaria o servidor
+        if estado["fase"] != "aberta":        # encerrou enquanto dormia
+            break
+        ganho_lingotes = estado["concluidas"]  # cada forja pronta funde 1 lingote
+        estado["minerios"] += estado["producao"]
+        estado["lingotes"] += ganho_lingotes
+        # FATO para todos, causado pelo temporizador e não por um clique.
+        await sio.emit("recurso.produzido", fato(
+            "temporizador", ganho_minerios=estado["producao"], ganho_lingotes=ganho_lingotes))
+
+
+async def obra(nome):
+    """Temporizador de uma forja: termina a obra TEMPO_OBRA segundos depois
+    de forja.construcao_iniciada."""
+    await sio.sleep(TEMPO_OBRA)
+    if estado["fase"] != "aberta":           # encerrada: a obra fica inacabada
+        return
+    estado["ferreiros"] -= 1
+    estado["em_obra"] -= 1
+    estado["concluidas"] += 1
+    # FATO para todos: a causa é a obra iniciada antes, via temporizador.
+    causa = "forja.construcao_iniciada (temporizador)"
+    await sio.emit("forja.construcao_concluida", fato(causa, por=nome))

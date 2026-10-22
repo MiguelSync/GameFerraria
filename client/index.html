@@ -59,7 +59,7 @@
 
     <section class="painel">
       <p>🪨 Minérios: <strong>{{ estado.minerios }}</strong> (+{{ porMinuto }}/min)</p>
-      <p>🧱 Lingotes: <strong>{{ estado.lingotes }}</strong></p>
+      <p>🧱 Lingotes: <strong>{{ estado.lingotes }}</strong> (+{{ lingotesPorMinuto }}/min)</p>
       <p>⚒️ Ferreiros: {{ estado.ferreiros }}/{{ estado.limite }}
         <progress :value="estado.ferreiros" :max="estado.limite"></progress></p>
       <p>🔥 Forjas: {{ estado.concluidas }} concluídas, {{ estado.em_obra }} em obra</p>
@@ -263,6 +263,8 @@
 
       const porMinuto = computed(() =>
         estado.intervalo ? Math.round(estado.producao * 60 / estado.intervalo) : 0);
+      const lingotesPorMinuto = computed(() =>
+        estado.intervalo ? Math.round(estado.concluidas * 60 / estado.intervalo) : 0);
 
       function avisar(texto, tipo = "info") {
         avisos.value.unshift({ texto, tipo });
@@ -339,6 +341,21 @@
           avisar(d.motivo, "erro");
           jogo.recusado(d.motivo);
         });
+
+        // Fato do TEMPORIZADOR (ninguém clicou): a mina produziu e as forjas
+        // prontas fundiram lingotes. O cliente só escuta, nunca pergunta.
+        ouvir("recurso.produzido", "atualiza o estoque e mostra +10 minérios (e +N lingotes)", (d) => {
+          atualizar(d);
+          jogo.recursoProduzido(d.estado, d);
+        });
+
+        // Fato do temporizador da obra: o ferreiro fica livre e a forja passa
+        // a fundir lingotes a partir do próximo ciclo.
+        ouvir("forja.construcao_concluida", "transforma o canteiro em forja acesa", (d) => {
+          atualizar(d);
+          avisar("Forja de " + d.por + " pronta! Agora ela funde lingotes.", "ok");
+          jogo.obraConcluida(d.estado);
+        });
       }
 
       // ===== PEDIDOS (emit): o cliente PEDE algo ao servidor =====
@@ -355,7 +372,7 @@
         // ETAPA 6: pedir "vila.encerramento_solicitado"
       }
 
-      return { nome, papel, conectado, estado, avisos, eventosVisiveis, contadores, ocultarProducao, porMinuto,
+      return { nome, papel, conectado, estado, avisos, eventosVisiveis, contadores, ocultarProducao, porMinuto, lingotesPorMinuto,
                entrar, abrirVila, construir, encerrarVila };
     }
   }).mount("#app");

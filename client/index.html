@@ -209,8 +209,13 @@
   function criarJogo() {
     let cena = null;          // a cena, quando já estiver pronta
     let partida = null;       // o jogo Phaser
-    const fila = [];          // chamadas feitas antes da cena existir
-    const chamar = (nome, ...args) => (cena ? cena[nome](...args) : fila.push([nome, args]));
+    let pendente = null;      // estado mais recente recebido antes de a cena existir
+    // Antes de a cena ficar pronta não há o que animar: guarda só o estado mais novo e,
+    // quando ela nascer, desenha a vila uma vez a partir dele (sem fila de cenas velhas).
+    const chamar = (nome, ...args) => {
+      if (cena) return cena[nome](...args);
+      if (args[0] && typeof args[0] === "object" && "fase" in args[0]) pendente = args[0];
+    };
 
     class VilaScene extends Phaser.Scene {
       constructor() { super("vila"); }
@@ -271,7 +276,7 @@
         }
 
         cena = this;
-        fila.splice(0).forEach(([nome, args]) => this[nome](...args));
+        if (pendente) this.reconstruir(pendente);
       }
 
       // ----- apoio -----
@@ -364,8 +369,12 @@
         const c = this.cenas[chave];
         if (!c) return;
         delete this.cenas[chave];
-        c.tweens.forEach((t) => { if (t.isPlaying() || t.isPaused()) t.complete(); });
+        // timers primeiro: os efeitos que eles criariam entram na cena e são completados abaixo
         c.timers.forEach((t) => { if (t.getProgress() < 1) { t.remove(false); t.fn(); } });
+        for (let k = 0; k < c.tweens.length; k++) {
+          const t = c.tweens[k];
+          try { if (!t.isDestroyed() && !t.isFinished()) t.complete(); } catch (e) { /* já terminou */ }
+        }
       }
       completarTudo() { Object.keys(this.cenas).forEach((k) => this.completarCena(k)); }
 
@@ -662,8 +671,9 @@
             const l = this.elemento("lingote", pilha.x - 6 + k * 6, pilha.y).setDepth(12);
             c.tween({ targets: l, x: quadro.x - 4 + k * 4, duration: 800, delay: k * 80 });
             c.tween({ targets: l, y: { from: pilha.y, to: quadro.y - 30 }, duration: 400, delay: k * 80,
-              ease: "Quad.Out", onComplete: () => this.tweens.add({ targets: l, y: quadro.y, alpha: 0,
-                duration: 400, ease: "Quad.In", onComplete: () => l.destroy() }) });
+              ease: "Quad.Out" });
+            c.tween({ targets: l, y: quadro.y, alpha: 0, duration: 400, delay: 400 + k * 80, ease: "Quad.In",
+              onComplete: () => l.destroy() });
           }
           const carimbo = this.elemento("carimbo", folha.x + 4, folha.y - 20).setDepth(13).setAlpha(0).setScale(1.6);
           c.tween({ targets: carimbo, y: folha.y + 2, alpha: 1, scale: 0.9, duration: 300, delay: 850,

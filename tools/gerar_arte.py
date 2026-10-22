@@ -596,14 +596,13 @@ def gerar_mapa():
     deco[2][14] = 44; chao_[2][14] = 6
     deco[3][1] = 53                                  # lenha perto da mina
     for (x, y, peca) in ((7, 0, 46), (12, 0, 46), (17, 0, 46), (23, 0, 46), (23, 2, 47),
-                         (0, 4, 46), (23, 4, 47), (6, 10, 46), (10, 11, 46), (11, 10, 47),
-                         (16, 11, 46), (21, 11, 46), (22, 11, 46), (23, 10, 46), (15, 9, 48),
-                         (9, 9, 49), (20, 9, 50), (3, 5, 55), (11, 3, 48), (16, 3, 50),
+                         (0, 4, 46), (6, 10, 46), (10, 11, 46), (11, 10, 47),
+                         (16, 11, 46), (21, 11, 46), (23, 11, 46), (23, 10, 46), (15, 9, 48),
+                         (10, 10, 49), (4, 4, 55), (11, 3, 48), (16, 3, 50),
                          (21, 1, 47), (10, 1, 49), (5, 10, 47)):
         deco[y][x] = peca
-    for x in range(19, 24):                          # cerca do pátio do quadro
-        deco[9][x] = 51
-    deco[9][19] = 51
+    for x in range(19, 23):                          # cerca do pátio do quadro
+        deco[10][x] = 51
     deco[4][11] = 54; deco[8][16] = 54               # carvão perto dos lotes
 
     def ponto(nome, x, y):
@@ -613,11 +612,21 @@ def gerar_mapa():
     pts = [ponto("lote1", 136, 64), ponto("lote2", 216, 64), ponto("lote3", 296, 64),
            ponto("lote4", 136, 144), ponto("lote5", 216, 144), ponto("lote6", 296, 144),
            ponto("mina", 40, 40), ponto("espera1", 24, 76), ponto("espera2", 60, 76),
-           ponto("saida", 40, 104), ponto("trilho_fim", 216, 40), ponto("pilha", 352, 128),
-           ponto("quadro", 356, 64), ponto("lanterna_mina", 66, 30), ponto("lanterna1", 104, 88),
+           ponto("saida", 40, 104), ponto("trilho_fim", 220, 40), ponto("pilha", 352, 128),
+           ponto("quadro", 356, 64), ponto("lanterna_mina", 10, 40), ponto("lanterna1", 104, 88),
            ponto("lanterna2", 256, 88), ponto("lanterna3", 328, 120)]
     for i, p_ in enumerate(pts, start=1):
         p_["id"] = i
+    por_nome = {p_["name"]: p_ for p_ in pts}
+    saida = por_nome["saida"]
+    assert all(chao_[saida["y"] // 16][x] >= 8 for x in range(L)), "rua horizontal em saida.y"
+    for n in range(1, 7):                            # 32x32 livres em volta de cada lote
+        lote = por_nome[f"lote{n}"]
+        for y in range(lote["y"] - 16, lote["y"] + 16, 16):
+            for x in range(lote["x"] - 16, lote["x"] + 16, 16):
+                assert deco[y // 16][x // 16] < 0, f"decoração no lote{n} ({x},{y})"
+    fim = por_nome["trilho_fim"]
+    assert fim["y"] // 16 != saida["y"] // 16, "trilho não pode cruzar a rua"
     plano = lambda m: [v + 1 if v >= 0 else 0 for linha in m for v in linha]   # noqa: E731
     return {
         "type": "map", "version": "1.10", "tiledversion": "1.10.2", "orientation": "orthogonal",

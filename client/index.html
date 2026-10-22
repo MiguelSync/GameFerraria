@@ -130,11 +130,42 @@
 
 <script>
   // =====================================================================
-  //  A VILA DESENHADA (Phaser) - já vem pronta, você NÃO precisa alterar.
-  //  O cenário é um MAPA (Tilemap) feito no Tiled: client/assets/vila.json.
-  //  Cada método abaixo reage a UM evento do servidor.
-  //  Seu trabalho é chamar o método certo dentro de cada socket.on(...).
+  //  A VILA DESENHADA (Phaser): a Ferraria em pixel art ORIGINAL, gerada por
+  //  tools/gerar_arte.py. O cenário é um MAPA do Tiled (client/assets/vila.json).
+  //  Cada método público reage a UM fato do servidor; a cena só desenha:
+  //  nunca muda o estado da vila nem emite eventos.
+  //  Contratos: specs/002-visual-ferraria/contracts/ (assets, mapa e cenas).
   // =====================================================================
+
+  // Cópia fixa dos pontos do mapa, usada só se vila.json não carregar.
+  const PONTOS_PADRAO = {
+    lote1: { x: 136, y: 64 }, lote2: { x: 216, y: 64 }, lote3: { x: 296, y: 64 },
+    lote4: { x: 136, y: 144 }, lote5: { x: 216, y: 144 }, lote6: { x: 296, y: 144 },
+    mina: { x: 40, y: 40 }, espera1: { x: 24, y: 76 }, espera2: { x: 60, y: 76 },
+    saida: { x: 40, y: 104 }, trilho_fim: { x: 220, y: 40 }, pilha: { x: 352, y: 128 },
+    quadro: { x: 356, y: 64 }, lanterna_mina: { x: 10, y: 40 }, lanterna1: { x: 104, y: 88 },
+    lanterna2: { x: 256, y: 88 }, lanterna3: { x: 328, y: 120 },
+  };
+
+  // Cada tipo de elemento: textura, quadro inicial e a RESERVA (emoji e alfa por quadro)
+  // usada no modo simples, quando a imagem dele não carregou (contracts/assets.md).
+  const TIPOS = {
+    ferreiro: { chave: "sprites16", quadro: 0, reserva: { "*": ["🧑‍🏭", 1] } },
+    faisca:   { chave: "sprites16", quadro: 7, reserva: { "*": ["✨", 1] } },
+    fumaca:   { chave: "sprites16", quadro: 8, reserva: { "*": ["💨", 0.7] } },
+    lingote:  { chave: "sprites16", quadro: 11, reserva: { "*": ["🧱", 1] } },
+    carrinho: { chave: "sprites16", quadro: 12, reserva: { 12: ["🛒", 1], 13: ["🛒🪨", 1] } },
+    lanterna: { chave: "sprites16", quadro: 14, reserva: { 14: ["🏮", 0.4], 15: ["🏮", 1] } },
+    carimbo:  { chave: "sprites16", quadro: 16, reserva: { "*": ["✅", 1] } },
+    pedaco:   { chave: "sprites16", quadro: 17, reserva: { "*": ["📜", 0.8] } },
+    canteiro: { chave: "sprites32", quadro: 0, reserva: { "*": ["🏗️", 1] } },
+    forja:    { chave: "sprites32", quadro: 1, reserva: { 4: ["🪨", 0.8], "*": ["🔥", 1] } },
+    mina:     { chave: "sprites32", quadro: 5, reserva: { 5: ["⛏️", 0.5], 6: ["⛏️", 1] } },
+    quadro:   { chave: "sprites32", quadro: 7, reserva: { "*": ["🪧", 1] } },
+    pergaminho: { chave: "sprites32", quadro: 8, reserva: { 9: ["📜", 0.6], 10: ["📜✅", 1], "*": ["📜", 1] } },
+    estrado:  { chave: "sprites32", quadro: 11, reserva: { "*": ["🪵", 1] } },
+  };
+
   function criarJogo() {
     let cena = null;          // a cena, quando já estiver pronta
     let partida = null;       // o jogo Phaser
@@ -144,137 +175,202 @@
     class VilaScene extends Phaser.Scene {
       constructor() { super("vila"); }
 
+      init() { this.falhas = new Set(); }   // chaves de arquivo que não carregaram
+
       preload() {
-        this.load.image("tiles", "assets/tileset-vila.png");                 // peças do cenário
-        this.load.spritesheet("sprites", "assets/sprites-vila.png",          // casa e canteiro
-          { frameWidth: 32, frameHeight: 32 });
-        this.load.tilemapTiledJSON("mapa", "assets/vila.json");              // o mapa
+        // Se um arquivo falhar, a cena segue no modo simples só para os elementos dele.
+        this.load.on("loaderror", (arquivo) => this.falhas.add(arquivo.key));
+        this.load.image("tiles", "assets/tileset-ferraria.png");
+        this.load.spritesheet("sprites16", "assets/sprites16-ferraria.png", { frameWidth: 16, frameHeight: 16 });
+        this.load.spritesheet("sprites32", "assets/sprites32-ferraria.png", { frameWidth: 32, frameHeight: 32 });
+        this.load.tilemapTiledJSON("mapa", "assets/vila.json");
       }
 
       create() {
-        // 1) o mapa: duas camadas de peças (chão e decoração)
-        const mapa = this.make.tilemap({ key: "mapa" });
-        const tileset = mapa.addTilesetImage("tileset-vila", "tiles");   // nome no Tiled, chave da imagem
-        mapa.createLayer("chao", tileset);
-        mapa.createLayer("decoracao", tileset);
+        this.larg = 384; this.alt = 192;
+        this.p = { ...PONTOS_PADRAO };
+        this.montarMapa();
+        this.cameras.main.setZoom(2).centerOn(this.larg / 2, this.alt / 2);
 
-        // 2) pontos marcados no mapa: onde ficam as obras e a mina de minério
-        const pontos = mapa.getObjectLayer("pontos").objects;
-        this.lotes = pontos.filter((p) => p.name.startsWith("lote"))
-          .sort((a, b) => a.name.localeCompare(b.name, "pt", { numeric: true }));
-        this.mina = pontos.find((p) => p.name === "mina");
+        // cenário fixo: mina, trilho com o carrinho, quadro de avisos, pilha e lanternas
+        this.mina = this.elemento("mina", this.p.mina.x, this.p.mina.y).setDepth(3);
+        this.carrinho = this.elemento("carrinho", this.p.mina.x + 22, this.p.trilho_fim.y).setDepth(4);
+        this.quadro = this.elemento("quadro", this.p.quadro.x, this.p.quadro.y).setDepth(3);
+        this.estrado = this.elemento("estrado", this.p.pilha.x, this.p.pilha.y).setDepth(3);
+        this.lanternas = ["lanterna_mina", "lanterna1", "lanterna2", "lanterna3"]
+          .map((n) => this.elemento("lanterna", this.p[n].x, this.p[n].y).setDepth(4));
+        this.pilha = [];        // lingotes desenhados sobre o estrado
+        this.lotes = [0, 1, 2, 3, 4, 5].map(() => ({ forjas: [], marca: null }));
+        this.obras = [];        // obras em andamento (a primeira a começar é a primeira a terminar)
+        this.usados = 0;        // quantos lotes já foram usados (próximo = usados % 6)
+        this.pergaminho = null; // a encomenda ativa desenhada no quadro
 
-        // 3) câmera: o mapa é pequeno (pixel art), então damos zoom 2x
-        this.cameras.main.setZoom(2).centerOn(mapa.widthInPixels / 2, mapa.heightInPixels / 2);
-        this.larg = mapa.widthInPixels;
-        this.alt = mapa.heightInPixels;
-
-        this.obras = [];      // obras em andamento (a primeira a começar é a primeira a terminar)
-        this.pergaminho = null;   // a encomenda ativa desenhada (📜 com a barra do prazo)
-        this.usados = 0;      // quantos lotes já foram usados
         this.faixa = this.add.text(this.larg / 2, 9, "⏳ Aguardando o Mestre abrir a ferraria", {
-          fontSize: "8px", color: "#ffffff", backgroundColor: "#00000099",
+          fontSize: "8px", color: "#ffffff", backgroundColor: "#2b1d14cc",
           padding: { x: 5, y: 2 }, resolution: 2,
-        }).setOrigin(0.5).setDepth(10);
+        }).setOrigin(0.5).setDepth(20);
 
         cena = this;
         fila.splice(0).forEach(([nome, args]) => this[nome](...args));
       }
 
       // ----- apoio -----
-      lote(i) { return this.lotes[i % this.lotes.length]; }
-      criarCasa(x, y) {               // a forja pronta: o prédio do kit com o fogo aceso
-        const casa = this.add.sprite(x, y, "sprites", 0);
-        const fogo = this.add.text(x + 7, y - 13, "🔥", { fontSize: "9px", resolution: 2 }).setOrigin(0.5);
-        this.tweens.add({ targets: [casa, fogo], scale: { from: 0.3, to: 1 }, duration: 400, ease: "Back.Out" });
-        this.tweens.add({ targets: fogo, alpha: { from: 1, to: 0.55 }, duration: 600, yoyo: true, repeat: -1 });
+      tem(chave) {                            // o arquivo carregou? (o mapa fica no cache de tilemaps)
+        const existe = chave === "mapa" ? this.cache.tilemap.exists(chave) : this.textures.exists(chave);
+        return existe && !this.falhas.has(chave);
       }
-      criarPergaminho(encomenda) {    // encomenda ativa: 📜 com a barra do prazo esvaziando
-        this.removerPergaminho();
-        const x = this.larg - 22, y = 28;
-        const icone = this.add.text(x, y, "📜 " + encomenda.quantidade + "🧱", {
-          fontSize: "8px", color: "#3b2a1a", backgroundColor: "#fff3d6cc", padding: { x: 3, y: 2 }, resolution: 2,
-        }).setOrigin(0.5).setDepth(9);
-        const fundo = this.add.rectangle(x - 12, y + 10, 24, 3, 0x333333).setOrigin(0, 0.5).setDepth(9);
-        const barra = this.add.rectangle(x - 12, y + 10, 24, 3, 0xe0662a).setOrigin(0, 0.5).setDepth(9);
-        barra.scaleX = encomenda.restante / encomenda.prazo;
-        this.tweens.add({ targets: barra, scaleX: 0, duration: encomenda.restante * 1000 });
-        this.pergaminho = { icone, fundo, barra, x, y };
+
+      montarMapa() {
+        if (!this.tem("mapa") || !this.tem("tiles")) return;   // reserva: Etapa 7 (modo simples)
+        const mapa = this.make.tilemap({ key: "mapa" });
+        const tileset = mapa.addTilesetImage("tileset-ferraria", "tiles");   // nome no Tiled, chave da imagem
+        mapa.createLayer("chao", tileset).setDepth(0);
+        mapa.createLayer("decoracao", tileset).setDepth(1);
+        const pontos = mapa.getObjectLayer("pontos");
+        (pontos ? pontos.objects : []).forEach((o) => { this.p[o.name] = { x: o.x, y: o.y }; });
+        this.larg = mapa.widthInPixels; this.alt = mapa.heightInPixels;
       }
-      removerPergaminho() {
-        if (!this.pergaminho) return null;
-        const { icone, fundo, barra, x, y } = this.pergaminho;
-        icone.destroy(); fundo.destroy(); barra.destroy();
-        this.pergaminho = null;
-        return { x, y };
+
+      // Fábrica: cria o sprite do tipo ou, se a imagem falhou, a reserva em emoji.
+      // Os dois respondem a definirQuadro(q), então as cenas não precisam saber qual é.
+      elemento(tipo, x, y) {
+        const t = TIPOS[tipo];
+        let el;
+        if (this.tem(t.chave)) {
+          el = this.add.sprite(x, y, t.chave, t.quadro);
+          el.definirQuadro = (q) => el.setFrame(q);
+        } else {
+          el = this.add.text(x, y, "", { fontSize: t.chave === "sprites32" ? "16px" : "10px", resolution: 2 })
+            .setOrigin(0.5);
+          el.reserva = true;
+          el.definirQuadro = (q) => {
+            const [emoji, alfa] = t.reserva[q] || t.reserva["*"];
+            el.setText(emoji).setAlpha(alfa);
+            return el;
+          };
+          el.definirQuadro(t.quadro);
+        }
+        el.tipo = tipo;
+        return el;
       }
-      criarObra(duracao) {
-        const { x, y } = this.lote(this.usados++);
-        const canteiro = this.add.sprite(x, y, "sprites", 1);
-        const fundo = this.add.rectangle(x - 10, y + 16, 20, 3, 0x333333).setOrigin(0, 0.5);
-        const barra = this.add.rectangle(x - 10, y + 16, 20, 3, 0xffd54a).setOrigin(0, 0.5);
-        barra.scaleX = 0;
-        this.tweens.add({ targets: barra, scaleX: 1, duration: duracao });
-        this.obras.push({ canteiro, fundo, barra, x, y });
-      }
+
+      lote(i) { return this.p["lote" + ((i % 6) + 1)]; }
+
       flutuar(texto, x, y, cor) {
         const t = this.add.text(x, y, texto, {
-          fontSize: "8px", color: cor, fontStyle: "bold", stroke: "#ffffff",
+          fontSize: "8px", color: cor, fontStyle: "bold", stroke: "#fff6e0",
           strokeThickness: 2, resolution: 2,
-        }).setOrigin(0.5).setDepth(8);
+        }).setOrigin(0.5).setDepth(18);
         this.tweens.add({ targets: t, y: y - 16, alpha: 0, duration: 1400, onComplete: () => t.destroy() });
       }
 
-      // ----- um método para cada evento do servidor -----
-      mostrarEstado(estado) {                 // estado.sincronizado
-        for (let i = 0; i < estado.concluidas; i++) {
-          const p = this.lote(this.usados++);
-          this.criarCasa(p.x, p.y);
-        }
-        for (let i = 0; i < estado.em_obra; i++) this.criarObra(estado.tempo_obra * 1000);
-        if (estado.encomenda) this.criarPergaminho(estado.encomenda);
-        if (estado.fase === "aberta") this.vilaIniciada();
-        if (estado.fase === "encerrada") this.vilaEncerrada();
+      criarForja(i, animar) {
+        const p = this.lote(i), lote = this.lotes[i % 6];
+        const forja = this.elemento("forja", p.x, p.y).setDepth(5 + p.y / 1000);
+        lote.forjas.push(forja);
+        if (animar) this.tweens.add({ targets: forja, scale: { from: 0.3, to: 1 }, duration: 400, ease: "Back.Out" });
+        this.marcarLote(i % 6);
       }
-      vilaIniciada() {                        // vila.iniciada
+      marcarLote(n) {                         // "×N" quando o lote já reúne 2 ou mais forjas
+        const lote = this.lotes[n], p = this.lote(n);
+        if (lote.marca) lote.marca.destroy();
+        lote.marca = lote.forjas.length > 1
+          ? this.add.text(p.x + 13, p.y - 14, "×" + lote.forjas.length, {
+              fontSize: "8px", color: "#fff6e0", backgroundColor: "#9c3d14", padding: { x: 2, y: 0 }, resolution: 2,
+            }).setOrigin(0.5).setDepth(9)
+          : null;
+      }
+      criarObra(duracao) {
+        const i = this.usados++, p = this.lote(i);
+        const canteiro = this.elemento("canteiro", p.x, p.y + 2).setDepth(6 + p.y / 1000);
+        const fundo = this.add.rectangle(p.x - 11, p.y - 19, 22, 3, 0x2b1d14).setOrigin(0, 0.5).setDepth(9);
+        const barra = this.add.rectangle(p.x - 11, p.y - 19, 22, 3, 0xffd54a).setOrigin(0, 0.5).setDepth(9);
+        barra.scaleX = 0;
+        this.tweens.add({ targets: barra, scaleX: 1, duration: duracao });
+        this.obras.push({ i, canteiro, fundo, barra });
+      }
+      desenharPilha(lingotes) {
+        this.pilha.forEach((s) => s.destroy());
+        this.pilha = [];
+        const { x, y } = this.p.pilha;
+        for (let k = 0; k < Math.min(lingotes, 10); k++) {
+          const col = k % 4, lin = Math.floor(k / 4);
+          this.pilha.push(this.elemento("lingote", x - 9 + col * 6 + lin * 3, y + 6 - lin * 4).setDepth(4));
+        }
+        if (this.numeroPilha) this.numeroPilha.destroy();
+        this.numeroPilha = lingotes > 10
+          ? this.add.text(x + 15, y - 6, String(lingotes), { fontSize: "8px", color: "#2b1d14",
+              backgroundColor: "#f1e1b8", padding: { x: 2, y: 0 }, resolution: 2 }).setOrigin(0.5).setDepth(9)
+          : null;
+      }
+      criarPergaminho(encomenda) {
+        this.removerPergaminho();
+        const { x, y } = this.p.quadro;
+        const folha = this.elemento("pergaminho", x, y - 2).setDepth(8);
+        const fundo = this.add.rectangle(x - 10, y + 12, 20, 2, 0x2b1d14).setOrigin(0, 0.5).setDepth(9);
+        const barra = this.add.rectangle(x - 10, y + 12, 20, 2, 0xc4511f).setOrigin(0, 0.5).setDepth(9);
+        barra.scaleX = encomenda.restante / encomenda.prazo;
+        this.tweens.add({ targets: barra, scaleX: 0, duration: encomenda.restante * 1000 });
+        this.pergaminho = { folha, fundo, barra };
+      }
+      removerPergaminho() {
+        if (!this.pergaminho) return;
+        Object.values(this.pergaminho).forEach((o) => o.destroy());
+        this.pergaminho = null;
+      }
+
+      // ----- um método para cada fato do servidor -----
+      mostrarEstado(estado) {                 // estado.sincronizado
+        for (let i = 0; i < estado.concluidas; i++) this.criarForja(this.usados++, false);
+        for (let i = 0; i < estado.em_obra; i++) this.criarObra(estado.tempo_obra * 1000);
+        this.desenharPilha(estado.lingotes);
+        if (estado.encomenda) this.criarPergaminho(estado.encomenda);
+        if (estado.fase === "aberta") this.vilaIniciada(estado);
+        if (estado.fase === "encerrada") this.vilaEncerrada(estado);
+      }
+      vilaIniciada(estado) {                  // vila.iniciada
         this.faixa.setText("☀️ Temporada aberta");
+        this.mina.definirQuadro(6);
       }
       obraIniciada(estado) {                  // forja.construcao_iniciada
         this.criarObra(estado.tempo_obra * 1000);
-        this.flutuar("-" + estado.custo + " 🪨", this.mina.x, this.mina.y, "#b00020");
+        this.flutuar("-" + estado.custo + " 🪨", this.p.mina.x, this.p.mina.y - 18, "#a8322a");
       }
       obraConcluida(estado) {                 // forja.construcao_concluida
         const obra = this.obras.shift();
         if (!obra) return;
         obra.canteiro.destroy(); obra.fundo.destroy(); obra.barra.destroy();
-        this.criarCasa(obra.x, obra.y);
-        this.flutuar("🔥 Forja pronta!", obra.x, obra.y - 18, "#9c3d14");
+        this.criarForja(obra.i, true);
+        const p = this.lote(obra.i);
+        this.flutuar("🔥 Forja pronta!", p.x, p.y - 22, "#9c3d14");
       }
       recursoProduzido(estado, d) {           // recurso.produzido
-        this.flutuar("+" + estado.producao + " 🪨", this.mina.x, this.mina.y, "#1b5e20");
+        this.flutuar("+" + estado.producao + " 🪨", this.p.mina.x, this.p.mina.y - 18, "#2e5d1a");
         if (d && d.ganho_lingotes > 0) {
-          this.flutuar("+" + d.ganho_lingotes + " 🧱", this.mina.x + 26, this.mina.y + 6, "#9c3d14");
+          this.flutuar("+" + d.ganho_lingotes + " 🧱", this.p.pilha.x, this.p.pilha.y - 14, "#9c3d14");
         }
+        this.desenharPilha(estado.lingotes);
+      }
+      recusado(motivo) {                      // operacao.recusada (só quem pediu)
+        this.cameras.main.shake(180, 0.006);
+        this.flutuar("✋ " + motivo, this.larg / 2, this.alt - 28, "#a8322a");
       }
       encomendaPublicada(estado) {            // encomenda.publicada
         this.criarPergaminho(estado.encomenda);
       }
       encomendaCumprida(estado) {             // encomenda.cumprida
-        const p = this.removerPergaminho() || { x: this.larg - 22, y: 28 };
-        this.flutuar("+40 🪨 encomenda entregue!", p.x - 30, p.y + 4, "#1b5e20");
+        this.removerPergaminho();
+        this.desenharPilha(estado.lingotes);
+        this.flutuar("+40 🪨 encomenda entregue!", this.p.quadro.x - 30, this.p.quadro.y - 20, "#2e5d1a");
       }
-      encomendaExpirada() {                   // encomenda.expirada
-        const p = this.removerPergaminho() || { x: this.larg - 22, y: 28 };
-        this.flutuar("⌛ Encomenda expirou", p.x - 24, p.y + 4, "#b00020");
+      encomendaExpirada(estado) {             // encomenda.expirada
+        this.removerPergaminho();
+        this.flutuar("⌛ Encomenda expirou", this.p.quadro.x - 24, this.p.quadro.y - 20, "#a8322a");
       }
-      recusado(motivo) {                      // operacao.recusada (só quem pediu)
-        this.cameras.main.shake(180, 0.006);
-        this.flutuar("✋ " + motivo, this.larg / 2, this.alt - 28, "#b00020");
-      }
-      vilaEncerrada() {                       // vila.encerrada
+      vilaEncerrada(estado) {                 // vila.encerrada
         this.faixa.setText("🌙 Temporada encerrada");
         this.removerPergaminho();
-        this.add.rectangle(this.larg / 2, this.alt / 2, this.larg, this.alt, 0x000033, 0.35).setDepth(5);
+        this.add.rectangle(this.larg / 2, this.alt / 2, this.larg, this.alt, 0x000033, 0.35).setDepth(15);
       }
     }
 
@@ -282,8 +378,8 @@
       iniciar(idContainer) {
         if (partida) return;
         partida = new Phaser.Game({
-          type: Phaser.AUTO, parent: idContainer, width: 576, height: 288,
-          pixelArt: true, backgroundColor: "#7bb661", scene: VilaScene, audio: { noAudio: true },
+          type: Phaser.AUTO, parent: idContainer, width: 768, height: 384,
+          pixelArt: true, backgroundColor: "#6f9e4b", scene: VilaScene, audio: { noAudio: true },
         });
       },
       mostrarEstado: (...a) => chamar("mostrarEstado", ...a),

@@ -1,25 +1,39 @@
-ASSETS DA VILA
-==============
+ASSETS DA VILA FERRARIA
+=======================
 
-Arte original criada para este trabalho (uso livre nos trabalhos da disciplina).
+Arte ORIGINAL, desenhada para este trabalho por tools/gerar_arte.py (pixel a pixel, paleta de
+31 cores). Autor: Miguel Antonio Selhorst (@MiguelSync). Licença: CC BY 4.0.
+O script foi escrito com ajuda de IA (ver "Uso de IA" no README). Nenhuma arte de jogo comercial.
 
-tileset-vila.png   peças do cenário, 16x16 px (64 peças, 16 por linha)
-sprites-vila.png   casa (quadro 0) e canteiro de obras (quadro 1), 32x32 px
-vila.json          o mapa (formato Tiled), 18 x 9 peças. Abra no Tiled para editar.
+Gerar de novo (na raiz do repositório):
+  pip install -r tools/requirements.txt
+  python tools/gerar_arte.py            os 3 PNGs
+  python tools/gerar_arte.py --mapa     os PNGs + vila.json (sobrescreve edições feitas no Tiled)
+  python tools/gerar_arte.py --previa   os PNGs + tools/previa.png (folha de contato numerada)
 
-PEÇAS DO TILESET (número mostrado no Tiled)
-  0, 1, 2     grama (lisa, com tufos, com flores)
-  8 a 23      CAMINHO. Número = 8 + soma dos lados em que há mais caminho:
-              Norte=1, Leste=2, Sul=4, Oeste=8
-              ex.: 8 = caminho isolado | 18 = reto horizontal (L+O) |
-                   13 = reto vertical (N+S) | 23 = cruzamento
-  24 a 39     ÁGUA. Mesma regra: 24 + soma dos lados com mais água
-              ex.: 39 = água por dentro da lagoa | 24 = poça isolada
-  40 árvore   41 arbusto   42 pedra   43 toco
-  44 toras    45 horta de cenoura   46 horta de trigo   47 cerca
+tileset-ferraria.png    256 x 64, peças 16 x 16 (64 peças, 16 por linha)
+  0-7    chão: grama (lisa, tufos, flores), terra batida, cascalho, grama escura, lastro, tábuas
+  8-23   CAMINHO de terra. Número = 8 + soma dos lados com mais caminho:
+         Norte=1, Leste=2, Sul=4, Oeste=8  (18 = reto horizontal, 13 = reto vertical, 23 = cruzamento)
+  24-39  ÁGUA, mesma regra: 24 + soma (39 = água por dentro)
+  40-45  trilho (horizontal, vertical, 2 curvas, 2 batentes)
+  46-55  pinheiro, arbusto, pedra, rochedo, toco, cerca (2), lenha, carvão, placa
+  56-63  paredão da pedreira (topo, meio, bordas, cantos), rochas soltas, veio de minério
 
-CAMADAS DO MAPA
-  chao         grama, caminho e água (todas as células preenchidas)
-  decoracao    árvores, pedras, hortas, cerca (células vazias onde não há nada)
-  pontos       (objetos) lote1 a lote6 = onde aparecem obras e casas
-                          acampamento = de onde sobem os "+10"
+sprites16-ferraria.png  128 x 48, quadros 16 x 16
+  0 ferreiro parado · 1-4 andando · 5-6 martelando · 7 faísca · 8-10 fumaça · 11 lingote
+  12-13 carrinho vazio/cheio · 14-15 lanterna apagada/acesa · 16 carimbo · 17-19 pedaços
+  de pergaminho · 20 pedra de minério
+
+sprites32-ferraria.png  128 x 96, quadros 32 x 32
+  0 canteiro (andaime e bigorna) · 1-3 forja acesa (brasa) · 4 forja apagada
+  5-6 mina fechada/aberta · 7 quadro de avisos · 8-10 pergaminho (pregado, amarelado,
+  carimbado) · 11 estrado da pilha de lingotes
+
+vila.json               o mapa (formato Tiled), 24 x 12 peças. Abre no Tiled para editar.
+  camadas: chao (todas as células), decoracao (0 = vazio) e pontos (objetos ponto):
+  lote1..lote6 (forjas), mina, espera1/espera2 (ferreiros livres), saida (frente da mina na
+  rua), trilho_fim (fim do trilho do carrinho), pilha (lingotes), quadro (encomendas),
+  lanterna_mina e lanterna1..lanterna3.
+
+Detalhes: specs/002-visual-ferraria/contracts/assets.md e contracts/mapa.md.

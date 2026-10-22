@@ -4,56 +4,89 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Vila Ferraria</title>
+  <!-- Fontes pixel (Google Fonts, licença OFL); sem elas, a fonte do sistema assume -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&family=VT323&display=swap" rel="stylesheet">
   <style>
     :root {
-      --fundo: #f6efe2; --cartao: #fffaf0; --borda: #c9b391; --texto: #3b2a1a; --suave: #7a6450;
-      --brasa: #c4511f; --brasa-escura: #9c3d14; --ok: #e3f0d6; --erro: #f8d9d0; --info: #f1e6d0;
+      --fundo: #efe4cc; --texto: #2b1d14; --suave: #6b543c;
+      --madeira: #8a5a32; --madeira-escura: #5a3d24; --madeira-clara: #b9824a;
+      --pergaminho: #f6ead0; --pergaminho-borda: #c9a86a;
+      --brasa: #c4511f; --brasa-escura: #9c3d14; --ok: #dcebc7; --erro: #f6d2c6; --info: #efe0bf;
+      --fonte-pixel: "Pixelify Sans", system-ui, sans-serif;
+      --fonte-painel: "VT323", ui-monospace, Consolas, monospace;
     }
-    body { font-family: system-ui, sans-serif; max-width: 580px; margin: 24px auto; padding: 0 12px;
+    body { font-family: var(--fonte-pixel); max-width: 1240px; margin: 14px auto; padding: 0 14px;
            background: var(--fundo); color: var(--texto); }
-    h1 { color: var(--brasa-escura); }
-    .cartao, .painel { border: 1px solid var(--borda); border-radius: 8px; padding: 12px; margin: 12px 0;
-                       background: var(--cartao); }
-    .painel p { margin: 6px 0; }
-    button { padding: 8px 14px; margin: 0 6px 6px 0; border-radius: 6px; border: 1px solid var(--brasa-escura);
-             background: var(--brasa); color: #fff; cursor: pointer; font-weight: 600; }
-    button:hover { background: var(--brasa-escura); }
-    input { padding: 8px; margin-bottom: 8px; width: 100%; box-sizing: border-box; border: 1px solid var(--borda);
-            border-radius: 6px; background: #fff; }
-    progress { accent-color: var(--brasa); }
-    .avisos { list-style: none; padding: 0; }
-    .avisos li { padding: 6px 10px; margin: 4px 0; border-radius: 6px; background: var(--info); }
+    h1 { color: var(--brasa-escura); margin: 0 0 2px; font-weight: 600; letter-spacing: 0.5px; }
+    .subtitulo { margin: 0 0 8px; color: var(--suave); }
+    /* tábua de madeira: estoque, botões e tela de entrada */
+    .madeira { background: repeating-linear-gradient(180deg, var(--madeira) 0 22px, var(--madeira-escura) 22px 24px);
+               color: #fff6e0; border: 3px solid var(--madeira-escura); border-radius: 6px; padding: 10px 12px;
+               box-shadow: inset 0 2px 0 var(--madeira-clara), 0 2px 0 #2b1d14; }
+    .cartao { max-width: 520px; margin: 40px auto; }
+    .cartao h1 { color: #ffd54a; }
+    .cartao p { color: #f1e1b8; }
+    .estoque { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 18px; margin: 8px 0; }
+    .estoque p { margin: 3px 0; font-size: 17px; }
+    .estoque strong { color: #ffd54a; }
+    .estoque .largo { grid-column: 1 / -1; }
+    button { font-family: var(--fonte-pixel); font-size: 16px; padding: 7px 14px; margin: 0 6px 6px 0; border-radius: 4px;
+             border: 2px solid #2b1d14; background: var(--brasa); color: #fff6e0; cursor: pointer; font-weight: 600;
+             box-shadow: inset 0 -3px 0 var(--brasa-escura); }
+    button:hover { background: #d8622c; }
+    button:active { box-shadow: inset 0 3px 0 var(--brasa-escura); }
+    input { font-family: var(--fonte-pixel); font-size: 16px; padding: 8px; margin-bottom: 8px; width: 100%;
+            box-sizing: border-box; border: 2px solid #2b1d14; border-radius: 4px; background: var(--pergaminho); }
+    progress { accent-color: #ffd54a; vertical-align: middle; }
+    .acoes { margin: 8px 0 4px; }
+    /* pergaminho: avisos e Painel de eventos */
+    .pergaminho { background: var(--pergaminho); border: 2px solid var(--pergaminho-borda); border-radius: 4px;
+                  box-shadow: 0 2px 0 #c9a86a; }
+    .avisos { list-style: none; padding: 0; margin: 4px 0; }
+    .avisos li { padding: 4px 10px; margin: 3px 0; font-size: 16px; }
+    .avisos li:nth-child(n+4) { display: none; }          /* só os 3 mais novos */
     .avisos li.ok { background: var(--ok); }
     .avisos li.erro { background: var(--erro); }
-    #jogo { margin: 12px 0; border-radius: 8px; overflow: hidden; line-height: 0; border: 3px solid #5a3d24; }
+    #jogo { border-radius: 6px; overflow: hidden; line-height: 0; border: 4px solid #5a3d24;
+            box-shadow: 0 3px 0 #2b1d14; }
     #jogo canvas { width: 100% !important; height: auto !important; image-rendering: pixelated; }
-    .eventos { border: 1px solid var(--borda); border-radius: 8px; padding: 10px; margin: 12px 0; background: var(--cartao); }
-    .eventos h2 { margin: 0 0 6px; font-size: 16px; }
-    .eventos .legenda { font-size: 12px; margin: 4px 0 8px; }
-    .eventos label { font-size: 12px; display: block; margin-bottom: 6px; }
+    .eventos { padding: 10px; margin: 0; }
+    .eventos h2 { margin: 0 0 4px; font-size: 20px; color: var(--brasa-escura); }
+    .eventos .legenda { font-size: 14px; margin: 2px 0 6px; }
+    .eventos label { font-size: 14px; display: block; margin-bottom: 6px; }
     .eventos input { width: auto; margin: 0 6px 0 0; }
-    .eventos ul { list-style: none; padding: 0; margin: 0; max-height: 280px; overflow-y: auto;
-                  font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
-    .eventos li { padding: 4px 8px; margin: 4px 0; border-left: 4px solid #999; background: #fff; }
+    .eventos ul { list-style: none; padding: 0; margin: 0; max-height: 300px; overflow-y: auto;
+                  font-family: var(--fonte-painel); font-size: 18px; line-height: 1.05; }
+    .eventos li { padding: 4px 8px; margin: 4px 0; border-left: 5px solid #999; background: #fffaf0; }
     .eventos li.pedido { border-color: #1976d2; }
     .eventos li.fato { border-color: #2e7d32; }
     .eventos li.recusa { border-color: #c62828; }
-    .eventos .causa, .eventos .dados { color: #666; }
+    .eventos .causa, .eventos .dados { color: #5d5146; }
     .eventos .reacao { color: #1b5e20; }
-    .eventos .hora { color: #888; }
-    .eventos .vazio { font-size: 12px; color: #888; }
-    .badge { display: inline-block; padding: 0 6px; border-radius: 4px; color: #fff; font-size: 11px; margin-right: 6px; }
+    .eventos .hora { color: #8a7a68; }
+    .eventos .vazio { font-size: 15px; color: #8a7a68; }
+    .badge { display: inline-block; padding: 0 6px; border-radius: 3px; color: #fff; font-size: 15px; margin-right: 6px;
+             font-family: var(--fonte-painel); }
     .badge.emit { background: #1976d2; }
     .badge.on { background: #2e7d32; }
-    .chip { display: inline-block; background: var(--info); border-radius: 10px; padding: 1px 8px; margin: 0 4px 4px 0; font-size: 11px; }
-    footer { margin-top: 32px; font-size: 13px; color: var(--suave); }
+    .chip { display: inline-block; background: var(--info); border: 1px solid var(--pergaminho-borda); border-radius: 3px;
+            padding: 0 6px; margin: 0 4px 4px 0; font-size: 15px; font-family: var(--fonte-painel); }
+    footer { margin: 18px 0 8px; font-size: 15px; color: var(--suave); }
+    /* duas colunas a partir de 1100 px: a vila à esquerda, o Painel de eventos à direita */
+    @media (min-width: 1100px) {
+      .colunas { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 16px; align-items: start; }
+      .eventos ul { max-height: calc(100vh - 230px); }
+    }
+    @media (max-width: 1099px) { .eventos { margin-top: 12px; } }
   </style>
 </head>
 <body>
 <div id="app">
 
   <!-- Tela de entrada -->
-  <section v-if="!conectado" class="cartao">
+  <section v-if="!conectado" class="cartao madeira">
     <h1>⚒️ Vila Ferraria</h1>
     <p>Vila em Tempo Real · ferreiros, minério e forjas</p>
     <input v-model="nome" placeholder="Seu nome">
@@ -64,23 +97,25 @@
   <!-- Tela da vila -->
   <main v-else>
     <h1>⚒️ Vila Ferraria</h1>
-    <p>{{ papel }}: <strong>{{ nome || "Anônimo" }}</strong> · Temporada: <strong>{{ estado.fase }}</strong></p>
+    <p class="subtitulo">{{ papel }}: <strong>{{ nome || "Anônimo" }}</strong> · Temporada: <strong>{{ estado.fase }}</strong></p>
 
+    <div class="colunas">
+    <div class="vila">
     <!-- A vila desenhada pelo Phaser aparece aqui -->
     <div id="jogo"></div>
 
-    <section class="painel">
+    <section class="estoque madeira">
       <p>🪨 Minérios: <strong>{{ estado.minerios }}</strong> (+{{ porMinuto }}/min)</p>
       <p>🧱 Lingotes: <strong>{{ estado.lingotes }}</strong> (+{{ lingotesPorMinuto }}/min)</p>
-      <p>⚒️ Ferreiros: {{ estado.ferreiros }}/{{ estado.limite }}
+      <p>⚒️ Ferreiros: <strong>{{ estado.ferreiros }}/{{ estado.limite }}</strong>
         <progress :value="estado.ferreiros" :max="estado.limite"></progress></p>
-      <p>🔥 Forjas: {{ estado.concluidas }} concluídas, {{ estado.em_obra }} em obra</p>
-      <p v-if="estado.encomenda">📜 Encomenda: {{ estado.encomenda.quantidade }} lingotes ·
+      <p>🔥 Forjas: <strong>{{ estado.concluidas }}</strong> prontas, {{ estado.em_obra }} em obra</p>
+      <p class="largo" v-if="estado.encomenda">📜 Encomenda: {{ estado.encomenda.quantidade }} lingotes ·
         paga {{ estado.encomenda.recompensa }} minérios · prazo {{ estado.encomenda.prazo }} s</p>
-      <p v-else>📜 Encomenda: nenhuma</p>
+      <p class="largo" v-else>📜 Encomenda: nenhuma</p>
     </section>
 
-    <section>
+    <section class="acoes">
       <template v-if="papel === 'mestre'">
         <button @click="abrirVila">☀️ Abrir temporada</button>
         <button @click="publicarEncomenda">📜 Publicar encomenda</button>
@@ -93,11 +128,12 @@
     </section>
 
     <ul class="avisos">
-      <li v-for="a in avisos" :class="a.tipo">{{ a.texto }}</li>
+      <li v-for="a in avisos" class="pergaminho" :class="a.tipo">{{ a.texto }}</li>
     </ul>
+    </div>
 
     <!-- PAINEL DE EVENTOS: mostra o paradigma funcionando (emit, on, causa e reação) -->
-    <section class="eventos">
+    <section class="eventos pergaminho">
       <h2>📡 Painel de eventos</h2>
       <p class="legenda">
         <span class="badge emit">⬆ emit</span> este cliente PEDIU algo ao servidor ·
@@ -119,6 +155,7 @@
       </ul>
       <p v-if="!eventosVisiveis.length" class="vazio">Nenhum evento ainda. Faça uma ação.</p>
     </section>
+    </div>
   </main>
 
   <footer>Desenvolvido por: Miguel Antonio Selhorst (@MiguelSync)</footer>
@@ -136,6 +173,9 @@
   //  nunca muda o estado da vila nem emite eventos.
   //  Contratos: specs/002-visual-ferraria/contracts/ (assets, mapa e cenas).
   // =====================================================================
+
+  // Fonte pixel dos textos da cena, com a do sistema como reserva.
+  const FONTE = '"Pixelify Sans", system-ui, sans-serif';
 
   // Cópia fixa dos pontos do mapa, usada só se vila.json não carregar.
   const PONTOS_PADRAO = {
@@ -220,7 +260,7 @@
         this.game.events.on("visible", () => { this.completarTudo(); if (this.ultimo) this.reconstruir(this.ultimo); });
 
         this.faixa = this.add.text(this.larg / 2, 9, "⏳ Aguardando o Mestre abrir a ferraria", {
-          fontSize: "8px", color: "#ffffff", backgroundColor: "#2b1d14cc",
+          fontFamily: FONTE, fontSize: "8px", color: "#ffffff", backgroundColor: "#2b1d14cc",
           padding: { x: 5, y: 2 }, resolution: 2,
         }).setOrigin(0.5).setDepth(20);
 
@@ -337,7 +377,7 @@
 
       flutuar(texto, x, y, cor) {
         const t = this.add.text(x, y, texto, {
-          fontSize: "8px", color: cor, fontStyle: "bold", stroke: "#fff6e0",
+          fontFamily: FONTE, fontSize: "8px", color: cor, fontStyle: "bold", stroke: "#fff6e0",
           strokeThickness: 2, resolution: 2,
         }).setOrigin(0.5).setDepth(18);
         this.tweens.add({ targets: t, y: y - 16, alpha: 0, duration: 1400, onComplete: () => t.destroy() });
@@ -371,7 +411,7 @@
         if (lote.marca) lote.marca.destroy();
         lote.marca = lote.forjas.length > 1
           ? this.add.text(p.x + 13, p.y - 14, "×" + lote.forjas.length, {
-              fontSize: "8px", color: "#fff6e0", backgroundColor: "#9c3d14", padding: { x: 2, y: 0 }, resolution: 2,
+              fontFamily: FONTE, fontSize: "8px", color: "#fff6e0", backgroundColor: "#9c3d14", padding: { x: 2, y: 0 }, resolution: 2,
             }).setOrigin(0.5).setDepth(9)
           : null;
       }
@@ -438,7 +478,7 @@
         }
         if (this.numeroPilha) this.numeroPilha.destroy();
         this.numeroPilha = lingotes > 10
-          ? this.add.text(x + 15, y - 6, String(lingotes), { fontSize: "8px", color: "#2b1d14",
+          ? this.add.text(x + 15, y - 6, String(lingotes), { fontFamily: FONTE, fontSize: "8px", color: "#2b1d14",
               backgroundColor: "#f1e1b8", padding: { x: 2, y: 0 }, resolution: 2 }).setOrigin(0.5).setDepth(9)
           : null;
       }
@@ -449,7 +489,7 @@
         const folha = this.elemento("pergaminho", x, y - 2).setDepth(8);
         const texto = this.add.text(Math.min(x, this.larg - 4), y - 26,
           encomenda.quantidade + " 🧱 · +" + encomenda.recompensa + " 🪨", {
-          fontSize: "7px", color: "#2b1d14", backgroundColor: "#f1e1b8", padding: { x: 2, y: 1 }, resolution: 2,
+          fontFamily: FONTE, fontSize: "7px", color: "#2b1d14", backgroundColor: "#f1e1b8", padding: { x: 2, y: 1 }, resolution: 2,
         }).setOrigin(1, 0.5).setDepth(9);     // alinhada pela direita para não sair da vila
         const fundo = this.add.rectangle(x - 10, y + 12, 20, 2, 0x2b1d14).setOrigin(0, 0.5).setDepth(9);
         const barra = this.add.rectangle(x - 10, y + 12, 20, 2, 0xc4511f).setOrigin(0, 0.5).setDepth(9);
@@ -576,7 +616,7 @@
         this.cameras.main.shake(300, 0.006);
         this.iniciarCena("balao", (c) => {    // um balão novo substitui o anterior
           const x = this.larg / 2, y = this.alt - 30;
-          const texto = this.add.text(x, y, "✋ " + motivo, { fontSize: "8px", color: "#2b1d14",
+          const texto = this.add.text(x, y, "✋ " + motivo, { fontFamily: FONTE, fontSize: "8px", color: "#2b1d14",
             fontStyle: "bold", resolution: 2 }).setOrigin(0.5).setDepth(31);
           const w = texto.width + 14, h = texto.height + 8;
           const balao = this.add.graphics().setDepth(30);
@@ -658,10 +698,17 @@
     return {
       iniciar(idContainer) {
         if (partida) return;
-        partida = new Phaser.Game({
-          type: Phaser.AUTO, parent: idContainer, width: 768, height: 384,
-          pixelArt: true, backgroundColor: "#6f9e4b", scene: VilaScene, audio: { noAudio: true },
-        });
+        partida = "carregando";
+        const criar = () => {
+          if (partida !== "carregando") return;
+          partida = new Phaser.Game({
+            type: Phaser.AUTO, parent: idContainer, width: 768, height: 384,
+            pixelArt: true, backgroundColor: "#6f9e4b", scene: VilaScene, audio: { noAudio: true },
+          });
+        };
+        // espera a fonte pixel por no máximo 1 s; sem ela, a vila usa a fonte do sistema
+        const fonte = document.fonts ? document.fonts.load('8px "Pixelify Sans"') : Promise.resolve();
+        Promise.race([fonte, new Promise((ok) => setTimeout(ok, 1000))]).then(criar, criar);
       },
       mostrarEstado: (...a) => chamar("mostrarEstado", ...a),
       vilaIniciada: (...a) => chamar("vilaIniciada", ...a),

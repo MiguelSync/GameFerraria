@@ -204,6 +204,10 @@
         this.obras = [];        // obras em andamento (a primeira a começar é a primeira a terminar)
         this.usados = 0;        // quantos lotes já foram usados (próximo = usados % 6)
         this.pergaminho = null; // a encomenda ativa desenhada no quadro
+        this.ferreiros = [];    // os ferreiros desenhados (tantos quanto o limite)
+        this.cenas = {};        // cena em andamento por elemento (sem fila)
+        this.ultimo = null;     // último estado recebido
+        this.criarAnimacoes();
 
         this.faixa = this.add.text(this.larg / 2, 9, "⏳ Aguardando o Mestre abrir a ferraria", {
           fontSize: "8px", color: "#ffffff", backgroundColor: "#2b1d14cc",
@@ -231,6 +235,18 @@
         this.larg = mapa.widthInPixels; this.alt = mapa.heightInPixels;
       }
 
+      criarAnimacoes() {                      // só existem se a imagem carregou
+        if (this.tem("sprites16")) {
+          const f16 = (a, b) => this.anims.generateFrameNumbers("sprites16", { start: a, end: b });
+          this.anims.create({ key: "andar", frames: f16(1, 4), frameRate: 8, repeat: -1 });
+          this.anims.create({ key: "martelar", frames: f16(5, 6), frameRate: 6, repeat: -1 });
+        }
+        if (this.tem("sprites32")) {
+          this.anims.create({ key: "brasa", repeat: -1, frameRate: 6,
+            frames: this.anims.generateFrameNumbers("sprites32", { start: 1, end: 3 }) });
+        }
+      }
+
       // Fábrica: cria o sprite do tipo ou, se a imagem falhou, a reserva em emoji.
       // Os dois respondem a definirQuadro(q), então as cenas não precisam saber qual é.
       elemento(tipo, x, y) {
@@ -253,6 +269,36 @@
         el.tipo = tipo;
         return el;
       }
+      animar(el, nome) {                      // anima o sprite; na reserva, um pulso equivalente
+        if (!el.reserva) { el.play(nome, true); return; }
+        if (el.pulso || nome === "andar") return;
+        el.pulso = this.tweens.add({ targets: el, scale: { from: 1, to: 1.25 }, duration: 260, yoyo: true, repeat: -1 });
+      }
+      parar(el, quadro) {
+        if (el.reserva) { if (el.pulso) { el.pulso.remove(); el.pulso = null; el.setScale(1); } }
+        else el.stop();
+        el.definirQuadro(quadro);
+      }
+      profundidade(el) { el.setDepth(5 + el.y / 1000); return el; }   // quem está mais abaixo fica na frente
+
+      // Cenas sem fila: cada elemento tem uma chave; uma cena nova na mesma chave
+      // completa a anterior na hora (FR-016).
+      iniciarCena(chave, criar) {
+        this.completarCena(chave);
+        const c = { tweens: [], timers: [] };
+        c.tween = (cfg) => { const t = this.tweens.add(cfg); c.tweens.push(t); return t; };
+        c.depois = (ms, fn) => { const t = this.time.delayedCall(ms, fn); t.fn = fn; c.timers.push(t); return t; };
+        this.cenas[chave] = c;
+        criar(c);
+      }
+      completarCena(chave) {
+        const c = this.cenas[chave];
+        if (!c) return;
+        delete this.cenas[chave];
+        c.tweens.forEach((t) => { if (t.isPlaying() || t.isPaused()) t.complete(); });
+        c.timers.forEach((t) => { if (t.getProgress() < 1) { t.remove(false); t.fn(); } });
+      }
+      completarTudo() { Object.keys(this.cenas).forEach((k) => this.completarCena(k)); }
 
       lote(i) { return this.p["lote" + ((i % 6) + 1)]; }
 
@@ -264,12 +310,28 @@
         this.tweens.add({ targets: t, y: y - 16, alpha: 0, duration: 1400, onComplete: () => t.destroy() });
       }
 
+      // ----- forjas, obras, ferreiros e pilha -----
       criarForja(i, animar) {
         const p = this.lote(i), lote = this.lotes[i % 6];
-        const forja = this.elemento("forja", p.x, p.y).setDepth(5 + p.y / 1000);
+        const forja = this.profundidade(this.elemento("forja", p.x, p.y));
         lote.forjas.push(forja);
         if (animar) this.tweens.add({ targets: forja, scale: { from: 0.3, to: 1 }, duration: 400, ease: "Back.Out" });
+        this.acenderForja(forja);
         this.marcarLote(i % 6);
+        return forja;
+      }
+      acenderForja(forja) {                   // brasa e fumaça enquanto a temporada estiver aberta
+        this.animar(forja, "brasa");
+        if (forja.fumaca) return;
+        forja.fumaca = this.time.addEvent({ delay: 900, loop: true, startAt: Math.random() * 900, callback: () => {
+          const nuvem = this.elemento("fumaca", forja.x + 8, forja.y - 16).setDepth(14).setAlpha(0.8);
+          this.tweens.add({ targets: nuvem, y: nuvem.y - 14, x: nuvem.x + 4, alpha: 0, scale: 1.6,
+            duration: 1600, onComplete: () => nuvem.destroy() });
+        } });
+      }
+      apagarForja(forja) {
+        this.parar(forja, 4);
+        if (forja.fumaca) { forja.fumaca.remove(); forja.fumaca = null; }
       }
       marcarLote(n) {                         // "×N" quando o lote já reúne 2 ou mais forjas
         const lote = this.lotes[n], p = this.lote(n);
@@ -280,14 +342,58 @@
             }).setOrigin(0.5).setDepth(9)
           : null;
       }
-      criarObra(duracao) {
+      criarObra(modo, duracao) {              // modo "exata" (vi começar) ou "andamento" (entrei no meio)
         const i = this.usados++, p = this.lote(i);
-        const canteiro = this.elemento("canteiro", p.x, p.y + 2).setDepth(6 + p.y / 1000);
+        const canteiro = this.profundidade(this.elemento("canteiro", p.x, p.y + 2));
         const fundo = this.add.rectangle(p.x - 11, p.y - 19, 22, 3, 0x2b1d14).setOrigin(0, 0.5).setDepth(9);
         const barra = this.add.rectangle(p.x - 11, p.y - 19, 22, 3, 0xffd54a).setOrigin(0, 0.5).setDepth(9);
-        barra.scaleX = 0;
-        this.tweens.add({ targets: barra, scaleX: 1, duration: duracao });
-        this.obras.push({ i, canteiro, fundo, barra });
+        if (modo === "exata") {
+          barra.scaleX = 0;
+          barra.anima = this.tweens.add({ targets: barra, scaleX: 1, duration: duracao });
+        } else {                              // sem a fração exata: barra "em andamento"
+          barra.scaleX = 0.25;
+          barra.anima = this.tweens.add({ targets: barra, scaleX: 0.85, duration: 900, yoyo: true, repeat: -1,
+            ease: "Sine.InOut" });
+        }
+        const obra = { i, p, canteiro, fundo, barra, ferreiro: null, modo };
+        this.obras.push(obra);
+        return obra;
+      }
+      criarFerreiros(limite) {
+        this.ferreiros.forEach((f) => f.sprite.destroy());
+        this.ferreiros = [];
+        for (let k = 0; k < limite; k++) {
+          const espera = this.p["espera" + (k % 2 + 1)];
+          const pos = { x: espera.x + Math.floor(k / 2) * 10, y: espera.y };
+          const sprite = this.profundidade(this.elemento("ferreiro", pos.x, pos.y));
+          this.ferreiros.push({ sprite, espera: pos, obra: null });
+        }
+      }
+      rotaAte(f, obra) {                      // espera -> frente da mina -> rua -> lote
+        const s = this.p.saida, alvo = { x: obra.p.x - 9, y: obra.p.y + 9 };   // ao lado da bigorna
+        return [f.espera, s, { x: alvo.x, y: s.y }, alvo];
+      }
+      caminhar(f, pontos, aoChegar) {
+        const seg = [];
+        let total = 0;
+        for (let k = 1; k < pontos.length; k++) {
+          const d = Phaser.Math.Distance.BetweenPoints(pontos[k - 1], pontos[k]);
+          seg.push({ ate: pontos[k], d }); total += d;
+        }
+        const duracao = Math.min(3000, (total / 90) * 1000);   // caminhada de no máximo 3 s
+        this.iniciarCena("ferreiro" + this.ferreiros.indexOf(f), (c) => {
+          this.animar(f.sprite, "andar");
+          let atraso = 0;
+          seg.forEach(({ ate, d }) => {
+            const ms = total ? (d / total) * duracao : 0;
+            c.tween({ targets: f.sprite, x: ate.x, y: ate.y, duration: Math.max(ms, 1), delay: atraso,
+              onStart: () => { if (ate.x !== f.sprite.x) f.sprite.setFlipX(ate.x < f.sprite.x); },
+              onUpdate: () => this.profundidade(f.sprite) });
+            atraso += ms;
+          });
+          c.depois(duracao + 1, () => { f.sprite.setPosition(pontos[pontos.length - 1].x, pontos[pontos.length - 1].y);
+            this.profundidade(f.sprite); this.parar(f.sprite, 0); aoChegar(); });
+        });
       }
       desenharPilha(lingotes) {
         this.pilha.forEach((s) => s.destroy());
@@ -319,11 +425,43 @@
         this.pergaminho = null;
       }
 
+      // ----- convergência: a vila desenhada sempre volta a bater com o estado -----
+      conferir(estado) {
+        this.ultimo = estado;
+        const forjas = this.lotes.reduce((n, l) => n + l.forjas.length, 0);
+        const livres = this.ferreiros.filter((f) => !f.obra).length;
+        if (forjas !== estado.concluidas || this.obras.length !== estado.em_obra ||
+            this.ferreiros.length !== estado.limite || livres !== estado.limite - estado.ferreiros ||
+            this.pilha.length !== Math.min(estado.lingotes, 10)) {
+          this.reconstruir(estado);
+        }
+      }
+      reconstruir(estado) {                   // limpa e desenha tudo como o estado diz, sem animação
+        this.ultimo = estado;
+        this.completarTudo();
+        this.lotes.forEach((l) => { l.forjas.forEach((f) => { this.apagarForja(f); f.destroy(); });
+          l.forjas = []; if (l.marca) l.marca.destroy(); l.marca = null; });
+        this.obras.forEach((o) => { o.canteiro.destroy(); o.fundo.destroy(); o.barra.destroy(); });
+        this.obras = [];
+        this.usados = 0;
+        for (let k = 0; k < estado.concluidas; k++) this.criarForja(this.usados++, false);
+        this.criarFerreiros(estado.limite);
+        for (let k = 0; k < estado.em_obra; k++) {
+          const obra = this.criarObra("andamento");
+          const f = this.ferreiros[k];
+          if (f) {                            // o ferreiro daquela obra já está martelando no lote
+            const alvo = this.rotaAte(f, obra).pop();
+            f.obra = obra; obra.ferreiro = f;
+            f.sprite.setPosition(alvo.x, alvo.y); this.profundidade(f.sprite);
+            this.animar(f.sprite, "martelar");
+          }
+        }
+        this.desenharPilha(estado.lingotes);
+      }
+
       // ----- um método para cada fato do servidor -----
       mostrarEstado(estado) {                 // estado.sincronizado
-        for (let i = 0; i < estado.concluidas; i++) this.criarForja(this.usados++, false);
-        for (let i = 0; i < estado.em_obra; i++) this.criarObra(estado.tempo_obra * 1000);
-        this.desenharPilha(estado.lingotes);
+        this.reconstruir(estado);
         if (estado.encomenda) this.criarPergaminho(estado.encomenda);
         if (estado.fase === "aberta") this.vilaIniciada(estado);
         if (estado.fase === "encerrada") this.vilaEncerrada(estado);
@@ -333,27 +471,68 @@
         this.mina.definirQuadro(6);
       }
       obraIniciada(estado) {                  // forja.construcao_iniciada
-        this.criarObra(estado.tempo_obra * 1000);
+        const obra = this.criarObra("exata", estado.tempo_obra * 1000);
         this.flutuar("-" + estado.custo + " 🪨", this.p.mina.x, this.p.mina.y - 18, "#a8322a");
+        const f = this.ferreiros.find((x) => !x.obra);
+        if (f) {                              // um ferreiro livre sai da mina e vai martelar
+          f.obra = obra; obra.ferreiro = f;
+          this.caminhar(f, this.rotaAte(f, obra), () => { if (f.obra === obra) this.animar(f.sprite, "martelar"); });
+        }
+        this.conferir(estado);
       }
       obraConcluida(estado) {                 // forja.construcao_concluida
-        const obra = this.obras.shift();
-        if (!obra) return;
-        obra.canteiro.destroy(); obra.fundo.destroy(); obra.barra.destroy();
-        this.criarForja(obra.i, true);
-        const p = this.lote(obra.i);
-        this.flutuar("🔥 Forja pronta!", p.x, p.y - 22, "#9c3d14");
+        const obra = this.obras.shift();      // a mais antiga termina primeiro
+        if (obra) {
+          obra.barra.anima.remove();
+          obra.canteiro.destroy(); obra.fundo.destroy(); obra.barra.destroy();
+          for (let k = 0; k < 3; k++) {       // "puf" de poeira
+            const n = this.elemento("fumaca", obra.p.x - 8 + k * 8, obra.p.y + 8).setDepth(14);
+            this.tweens.add({ targets: n, y: n.y - 8, alpha: 0, scale: 1.8, duration: 700, onComplete: () => n.destroy() });
+          }
+          this.criarForja(obra.i, true);
+          this.flutuar("🔥 Forja pronta!", obra.p.x, obra.p.y - 24, "#9c3d14");
+          const f = obra.ferreiro;
+          if (f) {                            // o ferreiro volta livre para a mina
+            f.obra = null;
+            const rota = this.rotaAte(f, obra).reverse();
+            rota[0] = { x: f.sprite.x, y: f.sprite.y };
+            this.caminhar(f, rota, () => {});
+          }
+        }
+        this.conferir(estado);
       }
       recursoProduzido(estado, d) {           // recurso.produzido
-        this.flutuar("+" + estado.producao + " 🪨", this.p.mina.x, this.p.mina.y - 18, "#2e5d1a");
-        if (d && d.ganho_lingotes > 0) {
+        const { mina, trilho_fim: fim } = this.p;
+        this.iniciarCena("carrinho", (c) => { // o carrinho leva o minério pelo trilho e volta vazio
+          const x0 = mina.x + 22;
+          this.carrinho.setX(x0); this.carrinho.definirQuadro(13);
+          c.tween({ targets: this.carrinho, x: fim.x, duration: 1200, ease: "Sine.InOut" });
+          c.depois(1200, () => this.carrinho.definirQuadro(12));
+          c.tween({ targets: this.carrinho, x: x0, duration: 1200, delay: 1250, ease: "Sine.InOut" });
+        });
+        this.flutuar("+" + estado.producao + " 🪨", mina.x, mina.y - 18, "#2e5d1a");
+        if (d && d.ganho_lingotes > 0) {      // cada forja acesa solta uma faísca
+          this.lotes.forEach((l) => l.forjas.forEach((forja) => {
+            const fa = this.elemento("faisca", forja.x - 3, forja.y + 4).setDepth(14).setScale(0.3);
+            this.tweens.add({ targets: fa, scale: 1, alpha: 0, y: fa.y - 6, duration: 600, onComplete: () => fa.destroy() });
+          }));
           this.flutuar("+" + d.ganho_lingotes + " 🧱", this.p.pilha.x, this.p.pilha.y - 14, "#9c3d14");
         }
         this.desenharPilha(estado.lingotes);
+        this.conferir(estado);
       }
       recusado(motivo) {                      // operacao.recusada (só quem pediu)
-        this.cameras.main.shake(180, 0.006);
-        this.flutuar("✋ " + motivo, this.larg / 2, this.alt - 28, "#a8322a");
+        this.cameras.main.shake(300, 0.006);
+        this.iniciarCena("balao", (c) => {    // um balão novo substitui o anterior
+          const x = this.larg / 2, y = this.alt - 30;
+          const texto = this.add.text(x, y, "✋ " + motivo, { fontSize: "8px", color: "#2b1d14",
+            fontStyle: "bold", resolution: 2 }).setOrigin(0.5).setDepth(31);
+          const w = texto.width + 14, h = texto.height + 8;
+          const balao = this.add.graphics().setDepth(30);
+          balao.fillStyle(0xf1e1b8, 1).fillRoundedRect(x - w / 2, y - h / 2, w, h, 4);
+          balao.lineStyle(1, 0x9c3d14, 1).strokeRoundedRect(x - w / 2, y - h / 2, w, h, 4);
+          c.depois(3500, () => { texto.destroy(); balao.destroy(); });
+        });
       }
       encomendaPublicada(estado) {            // encomenda.publicada
         this.criarPergaminho(estado.encomenda);
@@ -493,7 +672,7 @@
 
         // Fato para todos: um pedido de forja foi aceito, então todas as abas
         // mostram o canteiro e o estoque com o custo já debitado.
-        ouvir("forja.construcao_iniciada", "mostra o canteiro da forja e o -40 minérios", (d) => {
+        ouvir("forja.construcao_iniciada", "um ferreiro vai ao lote e começa a martelar a forja (−40 minérios, +1 ferreiro ocupado)", (d) => {
           atualizar(d);
           avisar(d.por + " começou uma forja");
           jogo.obraIniciada(d.estado);
@@ -501,21 +680,21 @@
 
         // Só esta aba recebe (o servidor manda com to=sid): foi ela que fez o
         // pedido recusado. Nada muda no estado, por isso não chama atualizar.
-        ouvir("operacao.recusada", "avisa o motivo e a vila treme", (d) => {
+        ouvir("operacao.recusada", "a vila treme e um balão mostra o motivo; nada muda (só nesta aba)", (d) => {
           avisar(d.motivo, "erro");
           jogo.recusado(d.motivo);
         });
 
         // Fato do TEMPORIZADOR (ninguém clicou): a mina produziu e as forjas
         // prontas fundiram lingotes. O cliente só escuta, nunca pergunta.
-        ouvir("recurso.produzido", "atualiza o estoque e mostra +10 minérios (e +N lingotes)", (d) => {
+        ouvir("recurso.produzido", "o carrinho sai da mina com +10 minérios; forjas acesas soltam faíscas e a pilha ganha os lingotes", (d) => {
           atualizar(d);
           jogo.recursoProduzido(d.estado, d);
         });
 
         // Fato do temporizador da obra: o ferreiro fica livre e a forja passa
         // a fundir lingotes a partir do próximo ciclo.
-        ouvir("forja.construcao_concluida", "transforma o canteiro em forja acesa", (d) => {
+        ouvir("forja.construcao_concluida", "o canteiro mais antigo vira forja acesa e o ferreiro volta livre à mina", (d) => {
           atualizar(d);
           avisar("Forja de " + d.por + " pronta! Agora ela funde lingotes.", "ok");
           jogo.obraConcluida(d.estado);

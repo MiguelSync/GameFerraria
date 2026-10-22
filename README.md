@@ -17,6 +17,8 @@ A especificação (regras, tabela de eventos e cenários de teste) está em
 - Comunicação em tempo real: Socket.IO
 - Tela: Vue 3 (painel e botões) e Phaser 3 (vila desenhada), carregados por CDN
 - Mapa: Tiled (`client/assets/vila.json`)
+- Arte: pixel art original gerada por `tools/gerar_arte.py` (Python + Pillow, só para desenvolvimento)
+- Fontes: Pixelify Sans e VT323 (Google Fonts)
 
 ## Como instalar e executar
 Pré-requisitos: Python 3 e Git.
@@ -24,11 +26,13 @@ Pré-requisitos: Python 3 e Git.
 ```bash
 git clone https://github.com/MiguelSync/lpp-trabalho01-miguel.git
 cd lpp-trabalho01-miguel
-python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn server:app --reload
 ```
+
+No Windows, troque as duas primeiras linhas por `py -m venv .venv` e `.venv\Scripts\activate`.
 
 Abra **http://localhost:8000** no navegador (não abra o arquivo direto, com `file://`).
 
@@ -38,23 +42,29 @@ O estado da vila fica na memória do servidor: ao reiniciar o servidor, a vila v
 Abra duas abas lado a lado em http://localhost:8000. Na primeira, digite um nome e clique em
 **Entrar como Mestre**; na segunda, **Entrar como Jogador**.
 
-1. **Antes de abrir:** o Jogador clica em **Construir forja** → só na aba dele aparece em vermelho
-   "A temporada não está aberta" e a vila treme (✋). O Mestre não recebe nada.
-2. **Abrir:** o Mestre clica em **Abrir temporada** → as duas abas mudam para *aberta* e a faixa vira
-   "☀️ Temporada aberta". A cada 5 s os minérios sobem +10 sozinhos (`recurso.produzido`, causa
-   *temporizador*).
-3. **Construir:** o Jogador constrói duas forjas → 40 minérios, ferreiros 2/2 nas duas abas, com o
-   canteiro e a barra de progresso. A terceira é recusada com "Sem ferreiro livre" só para ele.
-4. **Passagem do tempo:** 12 s depois, cada canteiro vira uma forja com o fogo aceso
-   (`forja.construcao_concluida`) e, a partir do ciclo seguinte, cada forja funde +1 lingote.
-5. **Encomenda:** o Mestre clica em **Publicar encomenda** → aparece o pergaminho 📜 com o prazo de
-   30 s em todas as abas. Com 3 lingotes ou mais, o Jogador clica em **Entregar encomenda** →
-   lingotes −3 e minérios +40 para todos. Se ninguém entregar, ela expira sozinha.
+1. **Antes de abrir:** a vila está de madrugada, com as lanternas acesas e a porta da mina fechada.
+   O Jogador clica em **Construir forja** → só na aba dele a vila treme e um balão mostra
+   "A temporada não está aberta". O Mestre não recebe nada.
+2. **Abrir:** o Mestre clica em **Abrir temporada** → nas duas abas amanhece, as lanternas apagam, a
+   mina abre e a fase muda para *aberta*. A cada 5 s o carrinho sai da mina pelo trilho e os
+   minérios sobem +10 sozinhos (`recurso.produzido`, causa *temporizador*).
+3. **Construir:** o Jogador constrói duas forjas → 40 minérios, ferreiros 2/2 nas duas abas. Um
+   ferreiro sai da mina, anda pela rua até o lote e martela no canteiro, com a barra da obra
+   enchendo. A terceira é recusada com "Sem ferreiro livre" só para ele.
+4. **Passagem do tempo:** 12 s depois, cada canteiro vira uma forja de pedra acesa, com fumaça na
+   chaminé (`forja.construcao_concluida`), e o ferreiro volta para a mina. A partir do ciclo
+   seguinte, as forjas soltam faíscas e a pilha de lingotes cresce (+1 lingote por forja).
+5. **Encomenda:** o Mestre clica em **Publicar encomenda** → um pergaminho é pregado no quadro de
+   avisos de todas as abas, com o prazo de 30 s esvaziando. Com 3 lingotes ou mais, o Jogador clica
+   em **Entregar encomenda** → três lingotes voam da pilha, o pergaminho é carimbado e a vila recebe
+   +40 minérios. Se ninguém entregar, o pergaminho amarela e se desfaz.
 6. **Disputa (três abas: Mestre, Jogador A e Jogador B):** com 1 de 2 ferreiros ocupado, A e B
    clicam em **Construir forja** quase ao mesmo tempo → só um consegue (2/2); o outro vê
    "Sem ferreiro livre". Os ferreiros nunca passam do limite.
-7. **Encerrar:** o Mestre clica em **Encerrar temporada** → a vila escurece em todas as abas, a
-   produção para, obras em andamento ficam inacabadas e qualquer ação é recusada.
+7. **Encerrar:** o Mestre clica em **Encerrar temporada** → anoitece em todas as abas, as forjas
+   apagam, as lanternas acendem, o carrinho e as obras param e qualquer ação é recusada.
+8. **Entrar no meio:** abra uma terceira aba a qualquer momento → ela vê a vila exatamente como
+   está (forjas, obras, ferreiros, pilha, encomenda e a luz da fase), pelo `estado.sincronizado`.
 
 Em cada passo, o **Painel de eventos** de cada aba mostra o que ela pediu (⬆ emit, azul) e o que
 ela escutou (⬇ on, verde; recusa em vermelho), com horário, causa, dados e a reação do cliente.
@@ -67,9 +77,10 @@ tempo:
 
 ```bash
 pip install -r tests/requirements.txt
-python tests/cenarios.py              # todos (usa os tempos reais: alguns minutos)
-python tests/cenarios.py disputa      # só um cenário
+python3 tests/cenarios.py              # todos (usa os tempos reais: alguns minutos)
+python3 tests/cenarios.py disputa      # só um cenário
 ```
+(Com o ambiente `.venv` ativado, `python` também funciona; no Windows use `py`.)
 
 ## Perguntas
 
@@ -108,16 +119,37 @@ clique.
   (`await sio.sleep(...)` e depois `sio.emit(...)`), com causa `temporizador`.
 - `fato(causa, ...)`: todo fato carrega a sua causa, que o Painel de eventos mostra.
 
+## Arte da vila (como é gerada)
+Toda a arte da vila é **original**, desenhada pixel a pixel por um script do próprio repositório
+(paleta de 31 cores, sem imagens de terceiros). O resultado é determinístico: rodar de novo gera os
+mesmos arquivos.
+
+```bash
+pip install -r tools/requirements.txt   # Pillow, só para desenvolvimento
+python3 tools/gerar_arte.py              # tileset e sprites em client/assets/
+python3 tools/gerar_arte.py --mapa       # + o mapa client/assets/vila.json (abre no Tiled)
+python3 tools/gerar_arte.py --previa     # + tools/previa.png, a folha de contato numerada
+```
+
+A vila reage a cada fato do servidor: amanhecer e anoitecer, ferreiros caminhando e martelando,
+forjas acesas com fumaça, carrinho de minério no trilho, pilha de lingotes e o quadro de avisos
+com o pergaminho da encomenda. Se alguma imagem não carregar, só aquele elemento vira emoji
+(modo simples) e o jogo continua. Detalhes em `specs/002-visual-ferraria/`.
+
 ## Uso de IA
 Usei IA no desenvolvimento, com o fluxo de especificação antes do código:
 
 - **GitHub Spec Kit** (`specify`, via Homebrew) para o fluxo constitution → specify → plan → tasks
-  → analyze. Os artefatos estão em `.specify/` e `specs/001-vila-ferraria/` (plano, modelo de dados,
-  um contrato por evento e a lista de tarefas por etapa).
+  → analyze. Os artefatos estão em `.specify/` e em duas features: `specs/001-vila-ferraria/` (as
+  regras e os eventos da vila) e `specs/002-visual-ferraria/` (a identidade visual, só de
+  apresentação, sem mudar nenhuma regra ou evento).
 - **Claude Code** como orquestrador e para implementar etapa por etapa, com agentes de apoio
   definidos em `.claude/agents/`: redator da especificação, planejador, revisor de eventos e
   testador de cenários.
 - **Codex** como revisor independente do código contra a especificação.
+- **Arte:** o script `tools/gerar_arte.py`, que desenha toda a pixel art e o mapa, foi escrito com
+  ajuda do Claude Code a partir da especificação 002; eu revisei a folha de contato e cada cena na
+  vila antes de cada commit.
 
 O que eu decidi e revisei: o tipo de vila (Ferraria, sorteado) e a proposta de regras e números,
 o fluxo próprio (encomenda com prazo), a aprovação da especificação antes de qualquer código, a
@@ -129,12 +161,17 @@ cada fato) voltaram primeiro para a especificação e só depois para o código.
 - **Contadores por evento** no Painel de eventos (obrigatório só para duplas).
 - **Recurso refinado:** lingotes, fundidos pelas forjas concluídas.
 - **Evento próprio:** encomenda com prazo (`encomenda.*`), com expiração por temporizador.
-- **Mapa personalizado** a partir do mapa do kit: toras e hortas trocadas por pedras e tocos de
-  pedreira; o ponto `acampamento` virou `mina`.
+- **Identidade visual própria (feature 002):** pixel art original gerada por script, mapa novo da
+  Ferraria (pedreira, mina com trilho, rua, lagoa, quadro de avisos), ferreiros animados, dia e
+  noite dirigidos pelos fatos, quadro de encomendas, interface de madeira e pergaminho com fonte
+  pixel e modo simples se a arte falhar.
 - **Testes automatizados** com clientes simulados (`tests/cenarios.py`).
 
 ## Créditos
-- Arte do mapa, peças e sprites: Kit Inicial da disciplina (`client/assets/LEIA-ME.txt`), arte
-  original de uso livre nos trabalhos da disciplina.
+- Arte da vila (tileset, sprites e mapa): original, criada para este trabalho por Miguel Antonio
+  Selhorst com `tools/gerar_arte.py`, licença **CC BY 4.0** (detalhes em `client/assets/LEIA-ME.txt`).
+  A arte do Kit Inicial da disciplina foi usada na primeira versão e substituída na feature 002.
+- Fontes: [Pixelify Sans](https://fonts.google.com/specimen/Pixelify+Sans) e
+  [VT323](https://fonts.google.com/specimen/VT323), via Google Fonts, licença SIL Open Font License.
 - Ícones: emojis do sistema.
 - Nenhuma arte de jogo comercial foi usada.

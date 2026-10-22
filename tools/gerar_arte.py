@@ -2,9 +2,9 @@
 
 Uso (na raiz do repositório, com o Pillow instalado: pip install -r tools/requirements.txt):
 
-    python tools/gerar_arte.py            # grava os 3 PNGs em client/assets/
-    python tools/gerar_arte.py --mapa     # idem + reescreve client/assets/vila.json
-    python tools/gerar_arte.py --previa   # idem + tools/previa.png (folha de contato 4x)
+    python3 tools/gerar_arte.py            # grava os 3 PNGs em client/assets/
+    python3 tools/gerar_arte.py --mapa     # idem + reescreve client/assets/vila.json
+    python3 tools/gerar_arte.py --previa   # idem + tools/previa.png (folha de contato 4x)
 
 Toda a arte é desenhada aqui, pixel a pixel, a partir de matrizes de letras e de primitivas
 (retângulo, linha, círculo) usando só as 31 cores de PALETA. Não há imagem de terceiros nem

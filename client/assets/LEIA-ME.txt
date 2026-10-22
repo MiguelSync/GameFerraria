@@ -7,9 +7,9 @@ O script foi escrito com ajuda de IA (ver "Uso de IA" no README). Nenhuma arte d
 
 Gerar de novo (na raiz do repositório):
   pip install -r tools/requirements.txt
-  python tools/gerar_arte.py            os 3 PNGs
-  python tools/gerar_arte.py --mapa     os PNGs + vila.json (sobrescreve edições feitas no Tiled)
-  python tools/gerar_arte.py --previa   os PNGs + tools/previa.png (folha de contato numerada)
+  python3 tools/gerar_arte.py            os 3 PNGs
+  python3 tools/gerar_arte.py --mapa     os PNGs + vila.json (sobrescreve edições feitas no Tiled)
+  python3 tools/gerar_arte.py --previa   os PNGs + tools/previa.png (folha de contato numerada)
 
 tileset-ferraria.png    256 x 64, peças 16 x 16 (64 peças, 16 por linha)
   0-7    chão: grama (lisa, tufos, flores), terra batida, cascalho, grama escura, lastro, tábuas

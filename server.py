@@ -82,3 +82,15 @@ async def abrir_vila(sid, dados=None):
     estado["fase"] = "aberta"
     # FATO para todos: a temporada mudou para todo mundo ao mesmo tempo.
     await sio.emit("vila.iniciada", fato(pedido, por=quem["nome"]))
+
+
+@sio.on("forja.construcao_solicitada")
+async def construir(sid, dados=None):
+    # Escuta o PEDIDO de um Jogador para erguer uma forja.
+    pedido = "forja.construcao_solicitada"
+    estado["minerios"] -= CUSTO
+    estado["ferreiros"] += 1
+    estado["em_obra"] += 1
+    nome = jogadores[sid]["nome"]
+    # FATO para todos: o estoque e os ferreiros mudaram para a vila inteira.
+    await sio.emit("forja.construcao_iniciada", fato(pedido, por=nome))

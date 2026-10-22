@@ -324,6 +324,14 @@
           avisar("A temporada começou!", "ok");
           jogo.vilaIniciada();
         });
+
+        // Fato para todos: um pedido de forja foi aceito, então todas as abas
+        // mostram o canteiro e o estoque com o custo já debitado.
+        ouvir("forja.construcao_iniciada", "mostra o canteiro da forja e o -40 minérios", (d) => {
+          atualizar(d);
+          avisar(d.por + " começou uma forja");
+          jogo.obraIniciada(d.estado);
+        });
       }
 
       // ===== PEDIDOS (emit): o cliente PEDE algo ao servidor =====
@@ -333,7 +341,8 @@
         pedir("vila.abertura_solicitada");
       }
       function construir() {
-        // ETAPA 3: pedir "construcao.solicitada"
+        // Só PEDE: o servidor confere minérios e ferreiros antes de aceitar.
+        pedir("forja.construcao_solicitada");
       }
       function encerrarVila() {
         // ETAPA 6: pedir "vila.encerramento_solicitado"

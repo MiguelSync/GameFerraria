@@ -264,6 +264,12 @@
           padding: { x: 5, y: 2 }, resolution: 2,
         }).setOrigin(0.5).setDepth(20);
 
+        if (this.falhas.size) {               // aviso discreto: não é evento nem entra no Painel
+          this.add.text(this.larg - 4, this.alt - 4, "arte indisponível — modo simples", {
+            fontFamily: FONTE, fontSize: "7px", color: "#fff6e0", backgroundColor: "#2b1d14aa",
+            padding: { x: 3, y: 1 }, resolution: 2 }).setOrigin(1, 1).setDepth(25);
+        }
+
         cena = this;
         fila.splice(0).forEach(([nome, args]) => this[nome](...args));
       }
@@ -275,7 +281,7 @@
       }
 
       montarMapa() {
-        if (!this.tem("mapa") || !this.tem("tiles")) return;   // reserva: Etapa 7 (modo simples)
+        if (!this.tem("mapa") || !this.tem("tiles")) { this.desenharChaoSimples(); return; }
         const mapa = this.make.tilemap({ key: "mapa" });
         const tileset = mapa.addTilesetImage("tileset-ferraria", "tiles");   // nome no Tiled, chave da imagem
         mapa.createLayer("chao", tileset).setDepth(0);
@@ -283,6 +289,19 @@
         const pontos = mapa.getObjectLayer("pontos");
         (pontos ? pontos.objects : []).forEach((o) => { this.p[o.name] = { x: o.x, y: o.y }; });
         this.larg = mapa.widthInPixels; this.alt = mapa.heightInPixels;
+      }
+
+      desenharChaoSimples() {                 // modo simples: o chão feito só com formas
+        const g = this.add.graphics().setDepth(0), p = this.p;
+        g.fillStyle(0x6f9e4b).fillRect(0, 0, this.larg, this.alt);           // grama
+        g.fillStyle(0x8f8576).fillRect(0, 0, 112, 64);                        // cascalho da pedreira
+        g.fillStyle(0x7b7b86).fillRect(0, 0, 96, 30);                         // paredão
+        g.fillStyle(0x9c7448).fillRect(0, p.saida.y - 6, this.larg, 12);      // rua de terra
+        g.fillRect(p.saida.x - 5, p.mina.y + 12, 10, p.saida.y - p.mina.y - 12);
+        [1, 2, 3, 4, 5, 6].forEach((n) => { const l = p["lote" + n];
+          g.fillRect(l.x - 4, Math.min(l.y, p.saida.y), 8, Math.abs(l.y - p.saida.y)); });
+        g.fillStyle(0x3d7fb3).fillTriangle(0, 112, 0, this.alt, 96, this.alt);  // lagoa
+        g.lineStyle(2, 0x6b7079).lineBetween(p.mina.x + 14, p.trilho_fim.y + 4, p.trilho_fim.x + 12, p.trilho_fim.y + 4);
       }
 
       criarAnimacoes() {                      // só existem se a imagem carregou

@@ -1,3 +1,6 @@
+import math
+import time
+
 import socketio
 
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
@@ -11,6 +14,9 @@ app = socketio.ASGIApp(sio, static_files={
 CUSTO = 40          # minérios por forja
 TEMPO_OBRA = 12     # segundos até a forja ficar pronta
 INTERVALO = 5       # segundos entre as produções da mina
+ENCOMENDA_QUANTIDADE = 3     # lingotes pedidos por encomenda
+ENCOMENDA_PRAZO = 30         # segundos para entregar
+ENCOMENDA_RECOMPENSA = 40    # minérios pagos ao cumprir
 
 estado = {
     "fase": "aguardando",     # aguardando -> aberta -> encerrada (nunca volta)
@@ -27,6 +33,7 @@ estado = {
     "encomenda": None,        # encomenda ativa do Mestre (no máximo uma)
 }
 jogadores = {}                # sid -> {"nome": ..., "papel": "mestre" | "jogador"}
+ultima_encomenda = 0         # contador de ids: cada publicação ganha um id novo
 
 
 def instantaneo():
@@ -34,7 +41,12 @@ def instantaneo():
     aninhado, então também é copiada (a cópia rasa a compartilharia)."""
     copia = dict(estado)
     if estado["encomenda"] is not None:
-        copia["encomenda"] = dict(estado["encomenda"])
+        encomenda = dict(estado["encomenda"])
+        # expira_em é interno (relógio do servidor); o cliente recebe quantos
+        # segundos faltam, que vale para qualquer aba, mesmo quem entra no meio.
+        expira_em = encomenda.pop("expira_em")
+        encomenda["restante"] = max(0, math.ceil(expira_em - time.monotonic()))
+        copia["encomenda"] = encomenda
     return copia
 
 
@@ -161,5 +173,79 @@ async def encerrar_vila(sid, dados=None):
     # Os temporizadores param sozinhos: ao acordar, conferem a fase e veem
     # que ela não está mais aberta (a mina para e as obras ficam inacabadas).
     estado["fase"] = "encerrada"
+    # A encomenda ativa é descartada: o prazo dela não expira depois.
+    estado["encomenda"] = None
     # FATO para todos: ninguém mais pode agir nesta temporada.
     await sio.emit("vila.encerrada", fato(pedido, por=quem["nome"]))
+
+
+@sio.on("encomenda.publicacao_solicitada")
+async def publicar_encomenda(sid, dados=None):
+    # Escuta o PEDIDO do Mestre para publicar uma encomenda de lingotes.
+    global ultima_encomenda
+    pedido = "encomenda.publicacao_solicitada"
+    quem = jogadores[sid]
+    if quem["papel"] != "mestre":
+        motivo = "Só o Mestre pode publicar encomendas"
+    elif estado["fase"] != "aberta":
+        motivo = "A temporada não está aberta"
+    elif estado["encomenda"] is not None:
+        motivo = "Já existe uma encomenda ativa"
+    else:
+        motivo = None
+    if motivo:
+        await recusar(sid, motivo, pedido)    # só quem pediu recebe
+        return
+    ultima_encomenda += 1
+    estado["encomenda"] = {
+        "id": ultima_encomenda,
+        "quantidade": ENCOMENDA_QUANTIDADE,
+        "prazo": ENCOMENDA_PRAZO,
+        "recompensa": ENCOMENDA_RECOMPENSA,
+        "por": quem["nome"],
+        "expira_em": time.monotonic() + ENCOMENDA_PRAZO,
+    }
+    # FATO para todos: todos os jogadores podem tentar cumprir a encomenda.
+    await sio.emit("encomenda.publicada", fato(pedido, por=quem["nome"]))
+    sio.start_background_task(prazo_encomenda, ultima_encomenda)   # o prazo começa a correr
+
+
+async def prazo_encomenda(id_encomenda):
+    """Temporizador do prazo: se a MESMA encomenda ainda estiver ativa depois
+    de ENCOMENDA_PRAZO segundos, ela expira. O id evita expirar uma encomenda
+    nova publicada depois que esta foi cumprida."""
+    await sio.sleep(ENCOMENDA_PRAZO)
+    encomenda = estado["encomenda"]
+    if estado["fase"] != "aberta" or encomenda is None or encomenda["id"] != id_encomenda:
+        return
+    estado["encomenda"] = None
+    # FATO para todos, causado pelo temporizador da encomenda publicada.
+    await sio.emit("encomenda.expirada", fato("encomenda.publicada (temporizador)"))
+
+
+@sio.on("encomenda.entrega_solicitada")
+async def entregar_encomenda(sid, dados=None):
+    # Escuta o PEDIDO de um Jogador para entregar os lingotes da encomenda.
+    pedido = "encomenda.entrega_solicitada"
+    quem = jogadores[sid]
+    # Validar e alterar sem await no meio: se dois Jogadores entregarem ao
+    # mesmo tempo, só o primeiro cumpre; o outro vê "Nenhuma encomenda ativa".
+    if quem["papel"] != "jogador":
+        motivo = "Só Jogadores entregam encomendas"
+    elif estado["fase"] != "aberta":
+        motivo = "A temporada não está aberta"
+    elif estado["encomenda"] is None:
+        motivo = "Nenhuma encomenda ativa"
+    elif estado["lingotes"] < estado["encomenda"]["quantidade"]:
+        motivo = "Lingotes insuficientes"
+    else:
+        motivo = None
+    if motivo:
+        await recusar(sid, motivo, pedido)    # só quem pediu recebe
+        return
+    encomenda = estado["encomenda"]
+    estado["lingotes"] -= encomenda["quantidade"]
+    estado["minerios"] += encomenda["recompensa"]
+    estado["encomenda"] = None
+    # FATO para todos: o estoque mudou e a encomenda saiu do quadro.
+    await sio.emit("encomenda.cumprida", fato(pedido, por=quem["nome"]))

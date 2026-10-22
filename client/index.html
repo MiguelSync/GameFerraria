@@ -3,20 +3,31 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Vila em Tempo Real</title>
+  <title>Vila Ferraria</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 580px; margin: 24px auto; padding: 0 12px; }
-    .cartao, .painel { border: 1px solid #ccc; border-radius: 8px; padding: 12px; margin: 12px 0; }
+    :root {
+      --fundo: #f6efe2; --cartao: #fffaf0; --borda: #c9b391; --texto: #3b2a1a; --suave: #7a6450;
+      --brasa: #c4511f; --brasa-escura: #9c3d14; --ok: #e3f0d6; --erro: #f8d9d0; --info: #f1e6d0;
+    }
+    body { font-family: system-ui, sans-serif; max-width: 580px; margin: 24px auto; padding: 0 12px;
+           background: var(--fundo); color: var(--texto); }
+    h1 { color: var(--brasa-escura); }
+    .cartao, .painel { border: 1px solid var(--borda); border-radius: 8px; padding: 12px; margin: 12px 0;
+                       background: var(--cartao); }
     .painel p { margin: 6px 0; }
-    button { padding: 8px 14px; margin-right: 6px; border-radius: 6px; border: 1px solid #888; cursor: pointer; }
-    input { padding: 8px; margin-bottom: 8px; width: 100%; box-sizing: border-box; }
+    button { padding: 8px 14px; margin: 0 6px 6px 0; border-radius: 6px; border: 1px solid var(--brasa-escura);
+             background: var(--brasa); color: #fff; cursor: pointer; font-weight: 600; }
+    button:hover { background: var(--brasa-escura); }
+    input { padding: 8px; margin-bottom: 8px; width: 100%; box-sizing: border-box; border: 1px solid var(--borda);
+            border-radius: 6px; background: #fff; }
+    progress { accent-color: var(--brasa); }
     .avisos { list-style: none; padding: 0; }
-    .avisos li { padding: 6px 10px; margin: 4px 0; border-radius: 6px; background: #eef; }
-    .avisos li.ok { background: #dfd; }
-    .avisos li.erro { background: #fdd; }
-    #jogo { margin: 12px 0; border-radius: 8px; overflow: hidden; line-height: 0; }
+    .avisos li { padding: 6px 10px; margin: 4px 0; border-radius: 6px; background: var(--info); }
+    .avisos li.ok { background: var(--ok); }
+    .avisos li.erro { background: var(--erro); }
+    #jogo { margin: 12px 0; border-radius: 8px; overflow: hidden; line-height: 0; border: 3px solid #5a3d24; }
     #jogo canvas { width: 100% !important; height: auto !important; image-rendering: pixelated; }
-    .eventos { border: 1px solid #ccc; border-radius: 8px; padding: 10px; margin: 12px 0; background: #fafafa; }
+    .eventos { border: 1px solid var(--borda); border-radius: 8px; padding: 10px; margin: 12px 0; background: var(--cartao); }
     .eventos h2 { margin: 0 0 6px; font-size: 16px; }
     .eventos .legenda { font-size: 12px; margin: 4px 0 8px; }
     .eventos label { font-size: 12px; display: block; margin-bottom: 6px; }
@@ -34,8 +45,8 @@
     .badge { display: inline-block; padding: 0 6px; border-radius: 4px; color: #fff; font-size: 11px; margin-right: 6px; }
     .badge.emit { background: #1976d2; }
     .badge.on { background: #2e7d32; }
-    .chip { display: inline-block; background: #eee; border-radius: 10px; padding: 1px 8px; margin: 0 4px 4px 0; font-size: 11px; }
-    footer { margin-top: 32px; font-size: 13px; color: #666; }
+    .chip { display: inline-block; background: var(--info); border-radius: 10px; padding: 1px 8px; margin: 0 4px 4px 0; font-size: 11px; }
+    footer { margin-top: 32px; font-size: 13px; color: var(--suave); }
   </style>
 </head>
 <body>
@@ -43,7 +54,8 @@
 
   <!-- Tela de entrada -->
   <section v-if="!conectado" class="cartao">
-    <h1>🏘️ Vila em Tempo Real</h1>
+    <h1>⚒️ Vila Ferraria</h1>
+    <p>Vila em Tempo Real · ferreiros, minério e forjas</p>
     <input v-model="nome" placeholder="Seu nome">
     <button @click="entrar('mestre')">Entrar como Mestre</button>
     <button @click="entrar('jogador')">Entrar como Jogador</button>
@@ -51,7 +63,7 @@
 
   <!-- Tela da vila -->
   <main v-else>
-    <h1>🏘️ Vila</h1>
+    <h1>⚒️ Vila Ferraria</h1>
     <p>{{ papel }}: <strong>{{ nome || "Anônimo" }}</strong> · Temporada: <strong>{{ estado.fase }}</strong></p>
 
     <!-- A vila desenhada pelo Phaser aparece aqui -->
@@ -63,14 +75,21 @@
       <p>⚒️ Ferreiros: {{ estado.ferreiros }}/{{ estado.limite }}
         <progress :value="estado.ferreiros" :max="estado.limite"></progress></p>
       <p>🔥 Forjas: {{ estado.concluidas }} concluídas, {{ estado.em_obra }} em obra</p>
+      <p v-if="estado.encomenda">📜 Encomenda: {{ estado.encomenda.quantidade }} lingotes ·
+        paga {{ estado.encomenda.recompensa }} minérios · prazo {{ estado.encomenda.prazo }} s</p>
+      <p v-else>📜 Encomenda: nenhuma</p>
     </section>
 
     <section>
       <template v-if="papel === 'mestre'">
-        <button @click="abrirVila">Abrir temporada</button>
-        <button @click="encerrarVila">Encerrar temporada</button>
+        <button @click="abrirVila">☀️ Abrir temporada</button>
+        <button @click="publicarEncomenda">📜 Publicar encomenda</button>
+        <button @click="encerrarVila">🌙 Encerrar temporada</button>
       </template>
-      <button v-else @click="construir">🔨 Construir forja (custo {{ estado.custo }} minérios)</button>
+      <template v-else>
+        <button @click="construir">🔨 Construir forja (custo {{ estado.custo }} 🪨)</button>
+        <button @click="entregarEncomenda">📦 Entregar encomenda (3 🧱)</button>
+      </template>
     </section>
 
     <ul class="avisos">
@@ -139,11 +158,11 @@
         mapa.createLayer("chao", tileset);
         mapa.createLayer("decoracao", tileset);
 
-        // 2) pontos marcados no mapa: onde ficam as obras e o acampamento de lenha
+        // 2) pontos marcados no mapa: onde ficam as obras e a mina de minério
         const pontos = mapa.getObjectLayer("pontos").objects;
         this.lotes = pontos.filter((p) => p.name.startsWith("lote"))
           .sort((a, b) => a.name.localeCompare(b.name, "pt", { numeric: true }));
-        this.acampamento = pontos.find((p) => p.name === "acampamento");
+        this.mina = pontos.find((p) => p.name === "mina");
 
         // 3) câmera: o mapa é pequeno (pixel art), então damos zoom 2x
         this.cameras.main.setZoom(2).centerOn(mapa.widthInPixels / 2, mapa.heightInPixels / 2);
@@ -151,8 +170,9 @@
         this.alt = mapa.heightInPixels;
 
         this.obras = [];      // obras em andamento (a primeira a começar é a primeira a terminar)
+        this.pergaminho = null;   // a encomenda ativa desenhada (📜 com a barra do prazo)
         this.usados = 0;      // quantos lotes já foram usados
-        this.faixa = this.add.text(this.larg / 2, 9, "⏳ Aguardando o Mestre", {
+        this.faixa = this.add.text(this.larg / 2, 9, "⏳ Aguardando o Mestre abrir a ferraria", {
           fontSize: "8px", color: "#ffffff", backgroundColor: "#00000099",
           padding: { x: 5, y: 2 }, resolution: 2,
         }).setOrigin(0.5).setDepth(10);
@@ -163,9 +183,30 @@
 
       // ----- apoio -----
       lote(i) { return this.lotes[i % this.lotes.length]; }
-      criarCasa(x, y) {
+      criarCasa(x, y) {               // a forja pronta: o prédio do kit com o fogo aceso
         const casa = this.add.sprite(x, y, "sprites", 0);
-        this.tweens.add({ targets: casa, scale: { from: 0.3, to: 1 }, duration: 400, ease: "Back.Out" });
+        const fogo = this.add.text(x + 7, y - 13, "🔥", { fontSize: "9px", resolution: 2 }).setOrigin(0.5);
+        this.tweens.add({ targets: [casa, fogo], scale: { from: 0.3, to: 1 }, duration: 400, ease: "Back.Out" });
+        this.tweens.add({ targets: fogo, alpha: { from: 1, to: 0.55 }, duration: 600, yoyo: true, repeat: -1 });
+      }
+      criarPergaminho(encomenda) {    // encomenda ativa: 📜 com a barra do prazo esvaziando
+        this.removerPergaminho();
+        const x = this.larg - 22, y = 28;
+        const icone = this.add.text(x, y, "📜 " + encomenda.quantidade + "🧱", {
+          fontSize: "8px", color: "#3b2a1a", backgroundColor: "#fff3d6cc", padding: { x: 3, y: 2 }, resolution: 2,
+        }).setOrigin(0.5).setDepth(9);
+        const fundo = this.add.rectangle(x - 12, y + 10, 24, 3, 0x333333).setOrigin(0, 0.5).setDepth(9);
+        const barra = this.add.rectangle(x - 12, y + 10, 24, 3, 0xe0662a).setOrigin(0, 0.5).setDepth(9);
+        barra.scaleX = encomenda.restante / encomenda.prazo;
+        this.tweens.add({ targets: barra, scaleX: 0, duration: encomenda.restante * 1000 });
+        this.pergaminho = { icone, fundo, barra, x, y };
+      }
+      removerPergaminho() {
+        if (!this.pergaminho) return null;
+        const { icone, fundo, barra, x, y } = this.pergaminho;
+        icone.destroy(); fundo.destroy(); barra.destroy();
+        this.pergaminho = null;
+        return { x, y };
       }
       criarObra(duracao) {
         const { x, y } = this.lote(this.usados++);
@@ -191,25 +232,40 @@
           this.criarCasa(p.x, p.y);
         }
         for (let i = 0; i < estado.em_obra; i++) this.criarObra(estado.tempo_obra * 1000);
+        if (estado.encomenda) this.criarPergaminho(estado.encomenda);
         if (estado.fase === "aberta") this.vilaIniciada();
         if (estado.fase === "encerrada") this.vilaEncerrada();
       }
       vilaIniciada() {                        // vila.iniciada
         this.faixa.setText("☀️ Temporada aberta");
       }
-      obraIniciada(estado) {                  // construcao.iniciada
+      obraIniciada(estado) {                  // forja.construcao_iniciada
         this.criarObra(estado.tempo_obra * 1000);
-        this.flutuar("-" + estado.custo + " 🪵", this.acampamento.x, this.acampamento.y, "#b00020");
+        this.flutuar("-" + estado.custo + " 🪨", this.mina.x, this.mina.y, "#b00020");
       }
-      obraConcluida(estado) {                 // construcao.concluida
+      obraConcluida(estado) {                 // forja.construcao_concluida
         const obra = this.obras.shift();
         if (!obra) return;
         obra.canteiro.destroy(); obra.fundo.destroy(); obra.barra.destroy();
         this.criarCasa(obra.x, obra.y);
-        this.flutuar("🏠 Obra concluída!", obra.x, obra.y - 18, "#1b5e20");
+        this.flutuar("🔥 Forja pronta!", obra.x, obra.y - 18, "#9c3d14");
       }
-      recursoProduzido(estado) {              // recurso.produzido
-        this.flutuar("+" + estado.producao + " 🪵", this.acampamento.x, this.acampamento.y, "#1b5e20");
+      recursoProduzido(estado, d) {           // recurso.produzido
+        this.flutuar("+" + estado.producao + " 🪨", this.mina.x, this.mina.y, "#1b5e20");
+        if (d && d.ganho_lingotes > 0) {
+          this.flutuar("+" + d.ganho_lingotes + " 🧱", this.mina.x + 26, this.mina.y + 6, "#9c3d14");
+        }
+      }
+      encomendaPublicada(estado) {            // encomenda.publicada
+        this.criarPergaminho(estado.encomenda);
+      }
+      encomendaCumprida(estado) {             // encomenda.cumprida
+        const p = this.removerPergaminho() || { x: this.larg - 22, y: 28 };
+        this.flutuar("+40 🪨 encomenda entregue!", p.x - 30, p.y + 4, "#1b5e20");
+      }
+      encomendaExpirada() {                   // encomenda.expirada
+        const p = this.removerPergaminho() || { x: this.larg - 22, y: 28 };
+        this.flutuar("⌛ Encomenda expirou", p.x - 24, p.y + 4, "#b00020");
       }
       recusado(motivo) {                      // operacao.recusada (só quem pediu)
         this.cameras.main.shake(180, 0.006);
@@ -217,6 +273,7 @@
       }
       vilaEncerrada() {                       // vila.encerrada
         this.faixa.setText("🌙 Temporada encerrada");
+        this.removerPergaminho();
         this.add.rectangle(this.larg / 2, this.alt / 2, this.larg, this.alt, 0x000033, 0.35).setDepth(5);
       }
     }
@@ -236,6 +293,9 @@
       recursoProduzido: (...a) => chamar("recursoProduzido", ...a),
       recusado: (...a) => chamar("recusado", ...a),
       vilaEncerrada: (...a) => chamar("vilaEncerrada", ...a),
+      encomendaPublicada: (...a) => chamar("encomendaPublicada", ...a),
+      encomendaCumprida: (...a) => chamar("encomendaCumprida", ...a),
+      encomendaExpirada: (...a) => chamar("encomendaExpirada", ...a),
     };
   }
 </script>
@@ -265,9 +325,9 @@
       let socket = null;
 
       const porMinuto = computed(() =>
-        estado.intervalo ? Math.round(estado.producao * 60 / estado.intervalo) : 0);
-      const lingotesPorMinuto = computed(() =>
-        estado.intervalo ? Math.round(estado.concluidas * 60 / estado.intervalo) : 0);
+        estado.fase === "aberta" && estado.intervalo ? Math.round(estado.producao * 60 / estado.intervalo) : 0);
+      const lingotesPorMinuto = computed(() =>   // só produz com a temporada aberta
+        estado.fase === "aberta" && estado.intervalo ? Math.round(estado.concluidas * 60 / estado.intervalo) : 0);
 
       function avisar(texto, tipo = "info") {
         avisos.value.unshift({ texto, tipo });
@@ -284,7 +344,9 @@
         const { estado: e, causa, ...resto } = d;
         const partes = Object.entries(resto).map(([k, v]) => k + ": " + v);
         if (e) partes.push("minérios " + e.minerios + ", lingotes " + e.lingotes +
-                           ", ferreiros " + e.ferreiros + "/" + e.limite);
+                           ", ferreiros " + e.ferreiros + "/" + e.limite +
+                           (e.encomenda ? ", encomenda: " + e.encomenda.quantidade + " lingotes (" +
+                                          e.encomenda.restante + "s)" : ""));
         return partes.join(" · ");
       }
       function registrar(sentido, nome, dados, reacao = "") {
@@ -308,6 +370,9 @@
       function entrar(p) {
         papel.value = p;
         socket = io({ auth: { nome: nome.value || "Anônimo", papel: p } });
+        // "connect" não é um evento da vila (nem pedido nem fato): é o aviso da
+        // própria conexão. Por isso usa socket.on direto e não aparece no painel;
+        // serve só para trocar de tela e começar a desenhar a vila.
         socket.on("connect", () => {
           conectado.value = true;
           nextTick(() => jogo.iniciar("jogo"));   // a vila desenhada começa quando a tela aparece
@@ -366,6 +431,28 @@
           avisar("Temporada encerrada.");
           jogo.vilaEncerrada();
         });
+
+        // Fato para todos: o Mestre publicou uma encomenda e o prazo começou a
+        // correr no servidor; qualquer Jogador pode tentar cumprir.
+        ouvir("encomenda.publicada", "mostra o pergaminho da encomenda com o prazo correndo", (d) => {
+          atualizar(d);
+          avisar("Nova encomenda: 3 lingotes em 30 s (paga 40 minérios)", "ok");
+          jogo.encomendaPublicada(d.estado);
+        });
+
+        // Fato para todos: um Jogador entregou os lingotes e a vila recebeu a recompensa.
+        ouvir("encomenda.cumprida", "recolhe o pergaminho e mostra +40 minérios", (d) => {
+          atualizar(d);
+          avisar(d.por + " entregou a encomenda! +40 minérios", "ok");
+          jogo.encomendaCumprida(d.estado);
+        });
+
+        // Fato do TEMPORIZADOR do prazo: ninguém entregou a tempo.
+        ouvir("encomenda.expirada", "risca o pergaminho: a encomenda venceu", (d) => {
+          atualizar(d);
+          avisar("A encomenda expirou.", "erro");
+          jogo.encomendaExpirada();
+        });
       }
 
       // ===== PEDIDOS (emit): o cliente PEDE algo ao servidor =====
@@ -378,13 +465,22 @@
         // Só PEDE: o servidor confere minérios e ferreiros antes de aceitar.
         pedir("forja.construcao_solicitada");
       }
+      function publicarEncomenda() {
+        // Só PEDE: o servidor confere se é o Mestre e se já não há encomenda ativa.
+        pedir("encomenda.publicacao_solicitada");
+      }
+      function entregarEncomenda() {
+        // Só PEDE: o servidor confere a encomenda e os lingotes; o botão nunca
+        // é desabilitado, para a recusa vir do servidor (fonte da verdade).
+        pedir("encomenda.entrega_solicitada");
+      }
       function encerrarVila() {
         // Só PEDE: o servidor confere se é o Mestre e se a temporada está aberta.
         pedir("vila.encerramento_solicitado");
       }
 
       return { nome, papel, conectado, estado, avisos, eventosVisiveis, contadores, ocultarProducao, porMinuto, lingotesPorMinuto,
-               entrar, abrirVila, construir, encerrarVila };
+               entrar, abrirVila, construir, encerrarVila, publicarEncomenda, entregarEncomenda };
     }
   }).mount("#app");
 </script>

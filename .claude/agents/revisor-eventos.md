@@ -21,7 +21,9 @@ Você é o revisor do projeto "Vila em Tempo Real — Ferraria". Você só lê e
 5. Temporizadores usam `await sio.sleep`, param quando a temporada não está aberta e emitem com
    `causa` correta (`temporizador`, `construcao.iniciada (temporizador)`...).
 6. Todo fato é montado com `fato(causa, ...)`; o painel mostra emit/on, causa, dados e reação.
-7. Frase de reação de cada `ouvir(...)` bate com a coluna "O que muda" da spec.
+7. Frase de reação de cada `ouvir(...)` bate com a coluna "O que muda" da spec e, a partir da
+   feature 002, com as frases de `specs/002-visual-ferraria/contracts/cenas.md` (que substituem a
+   linha "Reação no cliente" dos contratos da 001).
 8. Comentário explicando o porquê em todo ponto de emit/on.
 9. Cliente nunca altera o estado por conta própria.
 10. Números do código = números da spec. Contadores por evento visíveis. Rodapé com o nome.

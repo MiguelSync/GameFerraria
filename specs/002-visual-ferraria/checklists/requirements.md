@@ -61,4 +61,15 @@
     no repositório e que isso entra na declaração de uso de IA do README.
   - "Script versionado" foi mantido de forma genérica, sem citar linguagem ou ferramenta.
   - Todos os itens passam.
+- Validação 3 (2026-10-22, após `/speckit-analyze`): a spec foi alinhada às decisões do plano.
+  - SC-009 define o observador (pessoa sem contexto do projeto) e o método: vê a vila ou uma
+    captura de cada uma das 10 cenas, sem o Painel, e diz qual fato aconteceu. A meta é ≥ 8 de 10.
+  - SC-007, FR-018 e o teste da US7: a 1280 × 720, a vila, o estoque e os botões aparecem sem
+    rolar a página e sem sobreposição. O Painel de eventos rola por dentro e o rodapé fica ao fim
+    da página.
+  - `forja.construcao_iniciada`: o "−40 🪨" sobe da entrada da mina, porque o estoque não é
+    desenhado na vila.
+  - Lanternas: acesas na madrugada e na noite, apagadas no dia. Isso entrou na tabela
+    (`vila.iniciada`), na US1#1, na US5#1 e nas Assumptions.
+  - Todos os itens continuam passando.
 - Próximo passo: `/speckit-clarify` (opcional) ou `/speckit-plan`.

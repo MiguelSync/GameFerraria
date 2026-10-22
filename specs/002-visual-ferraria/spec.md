@@ -38,8 +38,8 @@ verificações, os motivos de recusa, os dados enviados e a causa de cada fato. 
 | Fato | Reação na vila desenhada | Duração da cena |
 |---|---|---|
 | `estado.sincronizado` | A vila aparece exatamente como está: luz da fase (madrugada, dia ou noite), uma forja acesa por forja concluída, um canteiro com ferreiro por obra em andamento, ferreiros livres na entrada da mina, pilha com os lingotes atuais e, se houver encomenda ativa, o pergaminho no quadro com o prazo restante | sem animação de entrada (≤ 1 s para aparecer); a barra das obras já em andamento fica em modo "em andamento", sem fração exata |
-| `vila.iniciada` | Amanhecer: a luz passa de madrugada para dia, a faixa da temporada vira "aberta", a lanterna da mina apaga e a mina "acorda" (porta aberta, trilho livre) | ≤ 2 s |
-| `forja.construcao_iniciada` | Um ferreiro livre sai da entrada da mina, caminha pelo caminho de terra até o próximo lote livre, o lote vira canteiro com andaime e bigorna e o ferreiro começa a martelar; acima do canteiro, uma barra de progresso do tempo da obra começa a encher; "−40 🪨" sobe do estoque | caminhada ≤ 3 s; barra enche ao longo dos 12 s da obra |
+| `vila.iniciada` | Amanhecer: a luz passa de madrugada para dia, a faixa da temporada vira "aberta", as lanternas da vila e da mina apagam e a mina "acorda" (porta aberta, trilho livre) | ≤ 2 s |
+| `forja.construcao_iniciada` | Um ferreiro livre sai da entrada da mina, caminha pelo caminho de terra até o próximo lote livre, o lote vira canteiro com andaime e bigorna e o ferreiro começa a martelar; acima do canteiro, uma barra de progresso do tempo da obra começa a encher; "−40 🪨" sobe da entrada da mina (o estoque não é desenhado na vila; o número fica no painel de estoque) | caminhada ≤ 3 s; barra enche ao longo dos 12 s da obra |
 | `forja.construcao_concluida` | O canteiro mais antigo vira forja de pedra acesa, com brasa e fumaça saindo da chaminé; a barra some; o ferreiro daquele canteiro volta caminhando até a entrada da mina | ≤ 3 s; fumaça e brasa continuam enquanto a temporada estiver aberta |
 | `recurso.produzido` | O carrinho sai da entrada da mina pelo trilho carregado de minério, com "+10 🪨" subindo; se o ciclo rendeu lingotes, cada forja acesa solta uma faísca e "+N lingotes" aparece, e a pilha de lingotes cresce até a quantidade atual | ≤ 3 s (termina antes do ciclo seguinte) |
 | `operacao.recusada` | Só na aba de quem pediu: a vila treme e um balão em pergaminho mostra o motivo exato recebido | ≤ 1,5 s de tremida; balão visível por ≥ 3 s |
@@ -72,7 +72,7 @@ aparece.
 1. **Given** a vila recém-iniciada (fase aguardando), **When** uma pessoa entra, **Then** a vila
    desenhada mostra a entrada da mina com trilho e carrinho, a pedreira, o caminho de terra batida
    ligando os 6 lotes vazios, o rio ou lagoa, o quadro de avisos vazio, 2 ferreiros livres na
-   entrada da mina, a pilha de lingotes vazia e a luz de madrugada.
+   entrada da mina, a pilha de lingotes vazia, a luz de madrugada e as lanternas acesas.
 2. **Given** a vila desenhada, **When** se compara com a arte do kit original, **Then** nenhuma peça
    do cenário, personagem ou objeto é a arte do kit nem de jogo comercial.
 3. **Given** a vila desenhada, **When** se conta os lotes, **Then** há exatamente 6 lotes nos
@@ -169,8 +169,9 @@ encomenda ativa, abrir uma terceira aba; depois encerrar e abrir uma quarta aba.
 
 **Acceptance Scenarios**:
 
-1. **Given** a fase aguardando (madrugada), **When** a aba recebe `vila.iniciada`, **Then** a vila
-   amanhece em até 2 s e a faixa da temporada mostra "aberta".
+1. **Given** a fase aguardando (madrugada, lanternas acesas), **When** a aba recebe
+   `vila.iniciada`, **Then** a vila amanhece em até 2 s, as lanternas apagam e a faixa da
+   temporada mostra "aberta".
 2. **Given** a temporada aberta com forjas acesas, uma obra em andamento e uma encomenda ativa,
    **When** a aba recebe `vila.encerrada`, **Then** a vila anoitece, as brasas e a fumaça apagam,
    as lanternas acendem, o ferreiro em obra para de martelar e fica no canteiro, a barra da obra
@@ -220,8 +221,9 @@ ou escondido.
 
 **Why this priority**: melhora a experiência, mas a vila funciona sem ela.
 
-**Independent Test**: abrir a página numa janela de 1280 × 720 e conferir que estoque, botões, vila,
-avisos, Painel de eventos (com contadores) e rodapé aparecem, são legíveis e nada se sobrepõe.
+**Independent Test**: abrir a página numa janela de 1280 × 720 e conferir que a vila, o estoque e
+os botões aparecem sem rolar a página e sem sobreposição, que o Painel de eventos (com contadores)
+rola por dentro e que o rodapé fica ao fim da página, tudo legível.
 
 **Acceptance Scenarios**:
 
@@ -346,7 +348,8 @@ cenários de `docs/especificacao.md`.
   pergaminho, tipografia pixel) e MUST continuar legíveis; nomes de eventos MUST aparecer letra por
   letra.
 - **FR-018**: Nenhum elemento visual MUST cobrir o Painel de eventos, os botões, os avisos ou o
-  rodapé, em nenhuma cena.
+  rodapé, em nenhuma cena. O Painel de eventos MUST rolar por dentro (a lista não empurra a vila
+  para fora da tela) e o rodapé MUST ficar ao fim da página.
 
 **Resiliência da arte**
 
@@ -393,12 +396,14 @@ cenários de `docs/especificacao.md`.
   cada um dos 10 fatos ainda tem reação visível.
 - **SC-006**: 100% dos itens de arte usados aparecem nos créditos do README com origem e licença; 0
   itens de jogos comerciais ou do kit original no cenário, personagens e objetos.
-- **SC-007**: Numa janela de 1280 × 720, a vila, o estoque, os botões, os avisos, o Painel de
-  eventos e o rodapé aparecem sem nenhuma sobreposição durante todas as cenas.
+- **SC-007**: Numa janela de 1280 × 720, a vila, o estoque e os botões aparecem sem rolar a página
+  e sem nenhuma sobreposição durante todas as cenas; o Painel de eventos rola por dentro, sem cobrir
+  nem ser coberto, e o rodapé fica ao fim da página.
 - **SC-008**: Depois de uma rajada de fatos (ex.: 2 obras, 3 ciclos e uma encomenda em 20 s), a
   vila desenhada para de se mexer e bate com o estado em até 3 s após o último fato.
-- **SC-009**: Uma pessoa que nunca viu a aplicação, olhando só a vila (sem ler o Painel), diz
-  corretamente o que aconteceu em pelo menos 8 dos 10 fatos.
+- **SC-009**: Um observador sem contexto do projeto (pessoa que nunca viu a aplicação nem a
+  especificação) vê uma captura ou a própria vila desenhada de cada uma das 10 cenas, sem o Painel
+  de eventos, e diz qual fato aconteceu; a meta é acertar pelo menos 8 de 10.
 
 ## Assumptions
 
@@ -423,6 +428,8 @@ cenários de `docs/especificacao.md`.
   entre abas são aceitáveis (o fato que vale é `forja.construcao_concluida`).
 - Os 2 ferreiros desenhados representam o limite de ferreiros; não há ferreiros extras de enfeite.
 - Fase aguardando é desenhada como madrugada, para que `vila.iniciada` seja um amanhecer visível.
+  As lanternas da vila e da mina ficam acesas na madrugada (aguardando) e na noite (encerrada) e
+  apagadas no dia (aberta).
 - Não há som nesta feature; não há mudança para celular (o alvo é janela de computador a partir de
   1280 × 720).
 - A ordem dos lotes e a regra de reaproveitamento seguem a 001 (cada aba escolhe o próximo lote

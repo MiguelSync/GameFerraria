@@ -442,20 +442,29 @@
               backgroundColor: "#f1e1b8", padding: { x: 2, y: 0 }, resolution: 2 }).setOrigin(0.5).setDepth(9)
           : null;
       }
+      // ----- quadro de avisos: o pergaminho da encomenda ativa -----
       criarPergaminho(encomenda) {
         this.removerPergaminho();
         const { x, y } = this.p.quadro;
         const folha = this.elemento("pergaminho", x, y - 2).setDepth(8);
+        const texto = this.add.text(Math.min(x, this.larg - 4), y - 26,
+          encomenda.quantidade + " 🧱 · +" + encomenda.recompensa + " 🪨", {
+          fontSize: "7px", color: "#2b1d14", backgroundColor: "#f1e1b8", padding: { x: 2, y: 1 }, resolution: 2,
+        }).setOrigin(1, 0.5).setDepth(9);     // alinhada pela direita para não sair da vila
         const fundo = this.add.rectangle(x - 10, y + 12, 20, 2, 0x2b1d14).setOrigin(0, 0.5).setDepth(9);
         const barra = this.add.rectangle(x - 10, y + 12, 20, 2, 0xc4511f).setOrigin(0, 0.5).setDepth(9);
-        barra.scaleX = encomenda.restante / encomenda.prazo;
-        this.tweens.add({ targets: barra, scaleX: 0, duration: encomenda.restante * 1000 });
-        this.pergaminho = { folha, fundo, barra };
+        barra.scaleX = encomenda.restante / encomenda.prazo;   // o prazo esvazia até a hora de expirar
+        barra.anima = this.tweens.add({ targets: barra, scaleX: 0, duration: encomenda.restante * 1000 });
+        this.pergaminho = { folha, texto, fundo, barra, recompensa: encomenda.recompensa };
+        return this.pergaminho;
       }
       removerPergaminho() {
-        if (!this.pergaminho) return;
-        Object.values(this.pergaminho).forEach((o) => o.destroy());
+        if (!this.pergaminho) return null;
+        const { folha, texto, fundo, barra } = this.pergaminho;
+        barra.anima.remove();
+        texto.destroy(); fundo.destroy(); barra.destroy();
         this.pergaminho = null;
+        return folha;                         // a folha fica para a cena de saída (carimbo ou rasgo)
       }
 
       // ----- convergência: a vila desenhada sempre volta a bater com o estado -----
@@ -465,7 +474,8 @@
         const livres = this.ferreiros.filter((f) => !f.obra).length;
         if (forjas !== estado.concluidas || this.obras.length !== estado.em_obra ||
             this.ferreiros.length !== estado.limite || livres !== estado.limite - estado.ferreiros ||
-            this.pilha.length !== Math.min(estado.lingotes, 10)) {
+            this.pilha.length !== Math.min(estado.lingotes, 10) ||
+            !!this.pergaminho !== (!!estado.encomenda && estado.fase === "aberta")) {
           this.reconstruir(estado);
         }
       }
@@ -496,12 +506,14 @@
           if (fase === "noite") obra.barra.anima.pause();       // a obra parou com a temporada
         }
         this.desenharPilha(estado.lingotes);
+        const folha = this.removerPergaminho();
+        if (folha) folha.destroy();
+        if (estado.encomenda && fase === "dia") this.criarPergaminho(estado.encomenda);
       }
 
       // ----- um método para cada fato do servidor -----
       mostrarEstado(estado) {                 // estado.sincronizado: a vila como está, sem animação
         this.reconstruir(estado);
-        if (estado.encomenda && estado.fase === "aberta") this.criarPergaminho(estado.encomenda);
       }
       vilaIniciada(estado) {                  // vila.iniciada: amanhece
         this.aplicarFase("dia", 1500);
@@ -573,17 +585,54 @@
           c.depois(3500, () => { texto.destroy(); balao.destroy(); });
         });
       }
-      encomendaPublicada(estado) {            // encomenda.publicada
-        this.criarPergaminho(estado.encomenda);
+      encomendaPublicada(estado) {            // encomenda.publicada: prega o pergaminho no quadro
+        this.iniciarCena("pergaminho", (c) => {
+          const { folha } = this.criarPergaminho(estado.encomenda);
+          const y = folha.y;
+          folha.setY(y - 14).setScale(1.3).setAlpha(0);
+          c.tween({ targets: folha, y, scale: 1, alpha: 1, duration: 600, ease: "Back.Out" });
+        });
+        this.conferir(estado);
       }
-      encomendaCumprida(estado) {             // encomenda.cumprida
-        this.removerPergaminho();
+      encomendaCumprida(estado) {             // encomenda.cumprida: lingotes vão ao quadro e o pergaminho é carimbado
+        const { quadro, pilha } = this.p;
+        this.iniciarCena("pergaminho", (c) => {
+          const recompensa = this.pergaminho ? this.pergaminho.recompensa : 40;
+          const folha = this.removerPergaminho() || this.elemento("pergaminho", quadro.x, quadro.y - 2).setDepth(8);
+          for (let k = 0; k < 3; k++) {       // três lingotes em arco da pilha até o quadro
+            const l = this.elemento("lingote", pilha.x - 6 + k * 6, pilha.y).setDepth(12);
+            c.tween({ targets: l, x: quadro.x - 4 + k * 4, duration: 800, delay: k * 80 });
+            c.tween({ targets: l, y: { from: pilha.y, to: quadro.y - 30 }, duration: 400, delay: k * 80,
+              ease: "Quad.Out", onComplete: () => this.tweens.add({ targets: l, y: quadro.y, alpha: 0,
+                duration: 400, ease: "Quad.In", onComplete: () => l.destroy() }) });
+          }
+          const carimbo = this.elemento("carimbo", folha.x + 4, folha.y - 20).setDepth(13).setAlpha(0).setScale(1.6);
+          c.tween({ targets: carimbo, y: folha.y + 2, alpha: 1, scale: 0.9, duration: 300, delay: 850,
+            onComplete: () => { folha.definirQuadro(10); carimbo.destroy(); } });
+          c.tween({ targets: folha, y: folha.y - 14, alpha: 0, duration: 600, delay: 1500,
+            onComplete: () => folha.destroy() });
+          c.depois(900, () => this.flutuar("+" + recompensa + " 🪨", quadro.x - 6, quadro.y - 22, "#2e5d1a"));
+        });
         this.desenharPilha(estado.lingotes);
-        this.flutuar("+40 🪨 encomenda entregue!", this.p.quadro.x - 30, this.p.quadro.y - 20, "#2e5d1a");
+        this.conferir(estado);
       }
-      encomendaExpirada(estado) {             // encomenda.expirada
-        this.removerPergaminho();
-        this.flutuar("⌛ Encomenda expirou", this.p.quadro.x - 24, this.p.quadro.y - 20, "#a8322a");
+      encomendaExpirada(estado) {             // encomenda.expirada: o pergaminho amarela e se desfaz
+        const { quadro } = this.p;
+        this.iniciarCena("pergaminho", (c) => {
+          const folha = this.removerPergaminho() || this.elemento("pergaminho", quadro.x, quadro.y - 2).setDepth(8);
+          folha.definirQuadro(9);
+          c.depois(500, () => {
+            for (let k = 0; k < 3; k++) {     // pedaços caem girando e somem
+              const pd = this.elemento("pedaco", folha.x - 6 + k * 6, folha.y).setDepth(12);
+              pd.definirQuadro(17 + k);
+              c.tween({ targets: pd, y: folha.y + 24, x: pd.x + (k - 1) * 6, angle: 160 * (k - 1 || 1), alpha: 0,
+                duration: 1100, onComplete: () => pd.destroy() });
+            }
+            folha.destroy();
+            this.flutuar("⌛ prazo vencido", quadro.x - 8, quadro.y - 22, "#a8322a");
+          });
+        });
+        this.conferir(estado);
       }
       vilaEncerrada(estado) {                 // vila.encerrada: anoitece e tudo para
         this.aplicarFase("noite", 2500);
@@ -598,7 +647,10 @@
           o.barra.anima.pause();
           if (o.ferreiro && !this.cenas["ferreiro" + this.ferreiros.indexOf(o.ferreiro)]) this.parar(o.ferreiro.sprite, 0);
         });
-        this.removerPergaminho();
+        this.iniciarCena("pergaminho", (c) => {   // a encomenda sai do quadro, sem cena de expiração
+          const folha = this.removerPergaminho();
+          if (folha) c.tween({ targets: folha, y: folha.y - 12, alpha: 0, duration: 800, onComplete: () => folha.destroy() });
+        });
         this.conferir(estado);
       }
     }
@@ -759,24 +811,24 @@
 
         // Fato para todos: o Mestre publicou uma encomenda e o prazo começou a
         // correr no servidor; qualquer Jogador pode tentar cumprir.
-        ouvir("encomenda.publicada", "mostra o pergaminho da encomenda com o prazo correndo", (d) => {
+        ouvir("encomenda.publicada", "prega no quadro o pergaminho da encomenda (3 lingotes, +40 minérios) com o prazo correndo", (d) => {
           atualizar(d);
           avisar("Nova encomenda: 3 lingotes em 30 s (paga 40 minérios)", "ok");
           jogo.encomendaPublicada(d.estado);
         });
 
         // Fato para todos: um Jogador entregou os lingotes e a vila recebeu a recompensa.
-        ouvir("encomenda.cumprida", "recolhe o pergaminho e mostra +40 minérios", (d) => {
+        ouvir("encomenda.cumprida", "3 lingotes vão da pilha ao quadro, o pergaminho é carimbado e a vila recebe +40 minérios", (d) => {
           atualizar(d);
           avisar(d.por + " entregou a encomenda! +40 minérios", "ok");
           jogo.encomendaCumprida(d.estado);
         });
 
         // Fato do TEMPORIZADOR do prazo: ninguém entregou a tempo.
-        ouvir("encomenda.expirada", "risca o pergaminho: a encomenda venceu", (d) => {
+        ouvir("encomenda.expirada", "o pergaminho amarela e se desfaz; nada é debitado nem pago", (d) => {
           atualizar(d);
           avisar("A encomenda expirou.", "erro");
-          jogo.encomendaExpirada();
+          jogo.encomendaExpirada(d.estado);
         });
       }
 

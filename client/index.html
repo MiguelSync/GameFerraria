@@ -332,6 +332,13 @@
           avisar(d.por + " começou uma forja");
           jogo.obraIniciada(d.estado);
         });
+
+        // Só esta aba recebe (o servidor manda com to=sid): foi ela que fez o
+        // pedido recusado. Nada muda no estado, por isso não chama atualizar.
+        ouvir("operacao.recusada", "avisa o motivo e a vila treme", (d) => {
+          avisar(d.motivo, "erro");
+          jogo.recusado(d.motivo);
+        });
       }
 
       // ===== PEDIDOS (emit): o cliente PEDE algo ao servidor =====

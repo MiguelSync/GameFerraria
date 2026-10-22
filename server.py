@@ -88,9 +88,29 @@ async def abrir_vila(sid, dados=None):
 async def construir(sid, dados=None):
     # Escuta o PEDIDO de um Jogador para erguer uma forja.
     pedido = "forja.construcao_solicitada"
+    quem = jogadores[sid]
+    # Valide TUDO antes de alterar o estado e sem await no meio: o servidor
+    # trata um evento por vez, então dois pedidos simultâneos são decididos
+    # em sequência (um vence, o outro é recusado). Um await entre validar e
+    # alterar deixaria os dois passarem pela validação.
+    if quem["papel"] != "jogador":
+        motivo = "Só Jogadores constroem forjas"
+    elif estado["fase"] != "aberta":
+        motivo = "A temporada não está aberta"
+    elif estado["minerios"] < CUSTO:
+        motivo = "Minério insuficiente"
+    elif estado["ferreiros"] >= estado["limite"]:
+        motivo = "Sem ferreiro livre"
+    else:
+        motivo = None
+
+    if motivo:
+        await recusar(sid, motivo, pedido)    # só quem pediu recebe
+        return
+
     estado["minerios"] -= CUSTO
     estado["ferreiros"] += 1
     estado["em_obra"] += 1
-    nome = jogadores[sid]["nome"]
+    nome = quem["nome"]
     # FATO para todos: o estoque e os ferreiros mudaram para a vila inteira.
     await sio.emit("forja.construcao_iniciada", fato(pedido, por=nome))
